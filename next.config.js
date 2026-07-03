@@ -1,18 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-}
-module.exports = nextConfig
-
-
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: 'standalone',
   typescript: {
-    ignoreBuildErrors: true, // نادیده گرفتن خطاهای تایپ‌اسکریپت
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: true, // نادیده گرفتن خطاهای ESLint
+    ignoreDuringBuilds: true,
   },
 }
+
 module.exports = nextConfig

@@ -1,31 +1,25 @@
-FROM docker.io/library/node:20-alpine AS builder
-# نصب ابزارهای مورد نیاز برای کامپایل better-sqlite3
-RUN apk add --no-cache python3 make g++
-
+# مرحله اول: نصب وابستگی‌ها
+FROM node:18-alpine AS deps
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# کپی فایل پکیجی که ساختیم
-COPY package.json ./
-# به جای npm ci از npm install استفاده می‌کنیم چون package-lock نداریم
-RUN npm install
-
-# کپی کل پروژه
+# مرحله دوم: بیلد پروژه
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# بیلد نهایی پروژه Next.js
+# نکته: مطمئن شو در next.config.js گزینه output: 'standalone' تنظیم شده است
 RUN npm run build
 
-FROM docker.io/library/node:20-alpine AS runner
+# مرحله سوم: اجرای برنامه
+FROM node:18-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# کپی فایل‌های خروجی کامپایل شده
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/database.sqlite ./database.sqlite
 
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
 CMD ["node", "server.js"]

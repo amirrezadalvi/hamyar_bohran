@@ -9,7 +9,7 @@ RUN npm install
 
 # کپی کردن کل پروژه
 COPY . .
-
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 # اجرای بیلد
 RUN npm run build
 

@@ -111,10 +111,8 @@ export default function CrisisManagementSystem() {
     { id: 103, type: 'آتش‌سوزی گسترده', severityValue: 40, description: 'دود شدید در یک ساختمان اداری تجاری به دلیل اتصال خازن‌های برق. (موقعیت ثبت شده: lat: 35.6700, lng: 51.3700)', reporterName: 'رضا علوی', reporterPhone: '09912201633', lat: 35.6700, lng: 51.3700, status: 'در دست بررسی', likes: 1, dislikes: 8, assignedHamyars: [] }
   ]);
 
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([
-    { id: 1, fullName: 'امیررضا دلوی', phone: '09912201633', nationalId: '220701057', skills: ['پزشک فوریت‌های پزشکی', 'امدادگر'], job: 'توسعه‌دهنده سیستم‌های پدافندی', address: 'تهران، خیابان آزادی، پلاک ۱۲', status: 'تایید شده', fixedPassword: 'abcdef123', rank: 'امدادگر متخصص' },
-    { id: 2, fullName: 'کوروش اکبری', phone: '09124445566', nationalId: '0021458796', skills: ['آتش‌نشان عملیاتی'], job: 'کادر آتشنشانی ایستگاه ۴', address: 'تهران، نیاوران، کوچه مریم', status: 'در انتظار تایید' }
-  ]);
+  // ========== VOLUNTEERS – now loaded from API ==========
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
 
   const [geo, setGeo] = useState({ lat: TEHRAN_FALLBACK.lat, lng: TEHRAN_FALLBACK.lng, accuracy: null as number | null, error: false, loading: true });
 
@@ -159,48 +157,54 @@ export default function CrisisManagementSystem() {
       if (savedView) setCurrentView(savedView as any);
       if (savedTheme !== null) setDarkMode(savedTheme === 'dark');
 
+      // ========== ANALYTICS – fetch from API and update ==========
       if (analyticsFired.current) return;
       analyticsFired.current = true;
 
-      const savedTotalHits = localStorage.getItem('real_hits');
-      const isNewUnique = !localStorage.getItem('real_unique_user');
-      const savedMobileHits = localStorage.getItem('real_mobile_hits');
-      const savedDesktopHits = localStorage.getItem('real_desktop_hits');
-
-      let currentHits = savedTotalHits ? parseInt(savedTotalHits) : 0;
-      currentHits += 1;
-      localStorage.setItem('real_hits', currentHits.toString());
-
-      if (isNewUnique) {
-        localStorage.setItem('real_unique_user', 'true');
-      }
-
       const userIsMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-      let mobCount = savedMobileHits ? parseInt(savedMobileHits) : 0;
-      let deskCount = savedDesktopHits ? parseInt(savedDesktopHits) : 0;
+      const isNewUnique = !localStorage.getItem('real_unique_user');
 
-      if (userIsMobile) {
-        mobCount += 1;
-        localStorage.setItem('real_mobile_hits', mobCount.toString());
-      } else {
-        deskCount += 1;
-        localStorage.setItem('real_desktop_hits', deskCount.toString());
-      }
+      // 1) Fetch current analytics
+      fetch('/api/analytics')
+        .then(res => res.json())
+        .then(data => {
+          // Prepare updated values
+          const updated = {
+            totalVisVisits: data.totalVisVisits + 1,
+            uniqueUsers: isNewUnique ? data.uniqueUsers + 1 : data.uniqueUsers,
+            mobileHits: userIsMobile ? data.mobileHits + 1 : data.mobileHits,
+            desktopHits: !userIsMobile ? data.desktopHits + 1 : data.desktopHits,
+            lastActiveTime: new Date().toLocaleTimeString('fa-IR')
+          };
 
-      const totalUniqueCalculated = isNewUnique 
-        ? (localStorage.getItem('total_unique_count') ? parseInt(localStorage.getItem('total_unique_count')!) + 1 : 1) 
-        : (localStorage.getItem('total_unique_count') ? parseInt(localStorage.getItem('total_unique_count')!) : 1);
-      
-      localStorage.setItem('total_unique_count', totalUniqueCalculated.toString());
-
-      setAnalytics({
-        totalVisVisits: currentHits,
-        uniqueUsers: totalUniqueCalculated,
-        mobileHits: mobCount,
-        desktopHits: deskCount,
-        lastActiveTime: new Date().toLocaleTimeString('fa-IR')
-      });
+          // 2) POST updated analytics
+          return fetch('/api/analytics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updated)
+          }).then(res => res.json());
+        })
+        .then(updatedAnalytics => {
+          setAnalytics(updatedAnalytics);
+          // mark unique user
+          if (isNewUnique) localStorage.setItem('real_unique_user', 'true');
+        })
+        .catch(err => {
+          console.error('Analytics sync failed:', err);
+          // fallback: keep local state as is (zeros) – no localStorage anymore
+        });
     }
+  }, []);
+
+  // ========== VOLUNTEERS – fetch from API on mount ==========
+  useEffect(() => {
+    fetch('/api/volunteers')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch volunteers');
+        return res.json();
+      })
+      .then(data => setVolunteers(data))
+      .catch(err => console.error('Error loading volunteers:', err));
   }, []);
 
   const navigateToView = (viewName: 'report' | 'volunteer' | 'admin' | 'support' | 'admin-edit' | 'analytics') => {
@@ -535,10 +539,33 @@ export default function CrisisManagementSystem() {
     const newVolunteer: Volunteer = {
       id: Date.now(), fullName: volName.trim(), phone: volPhone.trim(), nationalId: volNationalId.trim(), skills: finalSkills, job: volJob.trim(), address: volAddress.trim(), status: 'در انتظار تایید'
     };
+
+    // Update local state immediately (optimistic)
     setVolunteers(prev => [newVolunteer, ...prev]);
     setVolSubmitErrorErrorMsg('');
     alert("📝 فرم درخواست با موفقیت ثبت موقت شد.");
     setVolName(''); setVolPhone(''); setVolNationalId(''); setSelectedSkills([]); setCustomSkill(''); setVolJob(''); setVolAddress(''); setIsVolPhoneVerified(false);
+
+    // ========== POST new volunteer to API ==========
+    fetch('/api/volunteers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newVolunteer)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to save volunteer');
+        return res.json();
+      })
+      .then(data => {
+        // Optionally update the local entry with server-generated id if needed
+        // but we already have a local id, so we can just keep it.
+        console.log('Volunteer saved to database:', data);
+      })
+      .catch(err => {
+        console.error('Error saving volunteer:', err);
+        // Optionally revert local state or show error
+        // For now we just log
+      });
   };
 
   const handleApproveVolunteer = (id: number, e: any) => {
@@ -826,7 +853,7 @@ export default function CrisisManagementSystem() {
               {authMethod === 'password' ? (
                 <div>
                   <label className="block text-[11px] text-slate-400 mb-1.5">گذرواژه امنیتی ثابت</label>
-                  <input type="password" required placeholder="••••••••" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-slate-955 border border-slate-800 text-left dir-ltr font-mono rounded-xl px-4 py-2 text-xs text-white focus:outline-none" />
+                  <input type="password" required placeholder="••••••••" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-left dir-ltr font-mono rounded-xl px-4 py-2 text-xs text-white focus:outline-none" />
                 </div>
               ) : (
                 authOtpSent && (

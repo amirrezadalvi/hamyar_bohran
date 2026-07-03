@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 
-const NAVIDAA_API_KEY = "navidaa_live_8b36e65cbad45c8d1000dd7fdecc4b1fcd7962c0d574b0db3fb8701e695a8e36";
+const NAVIDAA_API_KEY = process.env.NAVIDAA_API_KEY || '';
 
 export async function POST(request: Request) {
   try {
+    if (!NAVIDAA_API_KEY) {
+      return NextResponse.json({ error: "API key not configured" }, { status: 500 });
+    }
+
     const { action, phone, idempotencyKey, verification_id, code } = await request.json();
 
     // بخش تایید کد ۶ رقمی

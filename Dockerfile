@@ -13,6 +13,8 @@ RUN npm run build
 
 FROM node:18-alpine AS runner
 WORKDIR /app
+# Force rebuild
+RUN echo "Rebuilding project"
 ENV NODE_ENV=production
 # کپی فایل‌های ضروری برای اجرا
 COPY --from=builder /app/public ./public

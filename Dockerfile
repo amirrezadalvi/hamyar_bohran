@@ -1,36 +1,23 @@
-# مرحله ۱: بیلد کردن پروژه
-FROM node:20-alpine AS builder
+FROM docker.io/library/node:20-alpine AS builder
+RUN apk add --no-cache python3 make g++
 WORKDIR /app
-
-# کپی فایل‌های مربوط به پکیج‌ها
 COPY package.json package-lock.json ./
+RUN npm min ci || npm ci
 
-# نصب پکیج‌ها (با --frozen-lockfile برای ثبات نسخه ها)
-RUN npm ci
-
-# کپی کردن کل سورس پروژه
 COPY . .
-
-# بیلد کردن پروژه (ساخت نسخه Standalone)
 RUN npm run build
 
-# مرحله ۲: ایجاد ایمیج نهایی برای اجرا
-FROM node:20-alpine AS runner
+FROM docker.io/library/node:20-alpine AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 
-# کپی کردن فایل‌های ضروری از مرحله قبل
-COPY --from=builder /app/public ./public
+# خط public حذف شد چون در ساختار فایل‌هایت نیست
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-# اگر دیتابیس در روت است، این خط را حتماً داشته باش:
 COPY --from=builder /app/database.sqlite ./database.sqlite
 
-# پورت اپلیکیشن
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# اجرای سرور
 CMD ["node", "server.js"]

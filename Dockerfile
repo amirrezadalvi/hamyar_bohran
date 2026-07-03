@@ -1,16 +1,20 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
+# نصب ابزارهای مورد نیاز برای کامپایل کردن بهتر-اس‌کیوالیت
+RUN apk add --no-cache python3 make g++
+
 # کپی فایل‌های پیکربندی
 COPY package.json ./
 
-# نصب تمام وابستگی‌ها (شامل devDependencies که Tailwind نیاز دارد)
+# نصب تمام وابستگی‌ها
 RUN npm install
 
 # کپی کردن کل پروژه
 COPY . .
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+
 # اجرای بیلد
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
 # مرحله اجرای برنامه

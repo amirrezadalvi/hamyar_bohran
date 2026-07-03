@@ -1,22 +1,23 @@
+# مرحله اول: نصب وابستگی‌ها
 FROM node:18-alpine AS deps
 WORKDIR /app
-# کپی فایل package.json برای نصب پکیج‌ها
 COPY package.json ./
+# استفاده از --no-dev=false برای اطمینان از نصب همه چیز از جمله devDependencies
 RUN npm install
 
+# مرحله دوم: بیلد پروژه
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# بیلد کردن پروژه
+# حالا چون tailwindcss در مرحله قبل نصب شده، اینجا پیدایش می‌کند
 RUN npm run build
 
+# مرحله سوم: اجرای برنامه
 FROM node:18-alpine AS runner
 WORKDIR /app
-# Force rebuild
-RUN echo "Rebuilding project"
 ENV NODE_ENV=production
-# کپی فایل‌های ضروری برای اجرا
+
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

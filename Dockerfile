@@ -1,23 +1,22 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# نصب ابزارهای مورد نیاز برای کامپایل پکیج‌های Native
+# نصب ابزارهای کامپایل
 RUN apk add --no-cache python3 make g++
 
-# کپی فایل‌های پیکربندی
-COPY package.json ./
+# فقط فایل‌های مربوط به پکیج‌ها را کپی می‌کنیم
+COPY package.json package-lock.json* ./
 
-# نصب تمیز پکیج‌ها در داخل داکر
+# نصب پکیج‌ها در محیط لینوکسی داکر
 RUN npm install
 
-# کپی کردن کدها
+# حالا کدها را کپی می‌کنیم
 COPY . .
 
-# بیلد
+# بیلد پروژه
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
-# مرحله نهایی
 FROM node:18-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

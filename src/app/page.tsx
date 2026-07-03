@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Navigation, Medal, Activity, Check, X, PhoneCall, LayoutDashboard, Lock, Unlock, User, Smartphone, Ban, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Send, Settings, Truck, Mail, Crosshair, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck } from 'lucide-react';
+import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Navigation, Medal, Activity, Check, X, PhoneCall, LayoutDashboard, Lock, Unlock, User, Smartphone, Ban, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Send, Settings, Truck, Mail, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck } from 'lucide-react';
+import NeshanLocationPicker from '@/components/NeshanLocationPicker';
 
 interface Incident {
   id: number;
@@ -103,8 +104,6 @@ export default function CrisisManagementSystem() {
     lastActiveTime: 'در حال پایش...'
   });
 
-  const [mapIcon, setMapIcon] = useState<any>(null);
-
   const [incidents, setIncidents] = useState<Incident[]>([
     { id: 101, type: 'زلزله یا تخریب سازه', severityValue: 85, description: 'تخریب جزیی ساختمان‌های قدیمی منطقه و ترک خوردگی دیوارهای اصلی کشف شده است. (موقعیت ثبت شده: lat: 35.6942, lng: 51.4000)', reporterName: 'احسان مدنی', reporterPhone: '09123456789', lat: 35.6942, lng: 51.4000, status: 'در دست بررسی', likes: 12, dislikes: 2, assignedHamyars: [] },
     { id: 102, type: 'بمباران / آسیب جنگی', severityValue: 95, description: 'شنیده شدن صدای انفجار مهیب در بخش شرقی حومه مسکونی پایتخت. (موقعیت ثبت شده: lat: 35.7150, lng: 51.4390)', reporterName: 'محمد کریمی', reporterPhone: '09351112233', lat: 35.7150, lng: 51.4390, status: 'تایید شده', likes: 45, dislikes: 0, assignedHamyars: [] },
@@ -113,8 +112,6 @@ export default function CrisisManagementSystem() {
 
   // ========== VOLUNTEERS – now loaded from API ==========
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
-
-  const [geo, setGeo] = useState({ lat: TEHRAN_FALLBACK.lat, lng: TEHRAN_FALLBACK.lng, accuracy: null as number | null, error: false, loading: true });
 
   const [crisisType, setCrisisType] = useState('زلزله یا تخریب سازه');
   const [customCrisis, setCustomCrisis] = useState('');
@@ -141,7 +138,6 @@ export default function CrisisManagementSystem() {
   const [isVolPhoneVerified, setIsVolPhoneVerified] = useState(false);
   const [volVerificationId, setVolVerificationId] = useState('');
 
-  const LeafletRefs = useRef<any>(null);
   const analyticsFired = useRef(false);
 
   // 🛡️ بازیابی و حفظ وضعیت لایگین، صفحه فعلی و تم شب/روز کاربر پس از رفرش
@@ -358,55 +354,9 @@ export default function CrisisManagementSystem() {
     }
   };
 
-  const requestGPSLocation = useCallback(() => {
-    if (typeof window === 'undefined' || !navigator.geolocation) { setGeo(prev => ({ ...prev, loading: false, error: true })); return; }
-    setGeo(prev => ({ ...prev, loading: true }));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const currentCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, error: false, loading: false });
-        setMarkerPos(currentCoords);
-      },
-      () => { 
-        setGeo(prev => ({ ...prev, loading: false, error: true }));
-      },
-      { enableHighAccuracy: true, timeout: 8000 }
-    );
-  }, []);
-
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    Promise.all([
-      import('react-leaflet'),
-      import('leaflet'),
-      import('leaflet/dist/leaflet.css' as any),
-    ]).then(([reactLeaflet, leafletModules]) => {
-      const L = leafletModules.default;
-      LeafletRefs.current = {
-        MapContainer: reactLeaflet.MapContainer, TileLayer: reactLeaflet.TileLayer, Marker: reactLeaflet.Marker, Circle: reactLeaflet.Circle, useMap: reactLeaflet.useMap, L: L,
-      };
-
-      const generatedIcon = L.icon({
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
-      });
-      setMapIcon(generatedIcon);
-
-      setIsMounted(true);
-      requestGPSLocation();
-    });
-  }, [requestGPSLocation]);
-
-  const MapViewSync = ({ center }: { center: { lat: number; lng: number } }) => {
-    const map = LeafletRefs.current?.useMap();
-    useEffect(() => { if (map) map.setView([center.lat, center.lng], 14); }, [center, map]);
-    return null;
-  };
+    setIsMounted(true);
+  }, []);
 
   const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -872,34 +822,16 @@ export default function CrisisManagementSystem() {
         {/* 🚨 نمای اول: ثبت گزارش حادثه */}
         {currentView === 'report' && (
           <div className="w-full h-full flex flex-col">
-            <div className="w-full h-2/5 md:h-1/3 border-b border-slate-800/20 relative bg-slate-800 z-0">
-              {isMounted && LeafletRefs.current ? (
-                <div className="w-full h-full relative">
-                  <LeafletRefs.current.MapContainer center={[markerPos.lat, markerPos.lng]} zoom={14} className="w-full h-full" zoomControl={false}>
-                    <LeafletRefs.current.TileLayer 
-                      attribution='&copy; OpenStreetMap contributors' 
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <MapViewSync center={{ lat: markerPos.lat, lng: markerPos.lng }} />
-                    {mapIcon && (
-                      <LeafletRefs.current.Marker 
-                        draggable={true} 
-                        position={[markerPos.lat, markerPos.lng]} 
-                        icon={mapIcon} 
-                        eventHandlers={{ 
-                          dragend(e: any) { 
-                            const latLng = e.target.getLatLng(); 
-                            setMarkerPos({ lat: latLng.lat, lng: latLng.lng }); 
-                          } 
-                        }} 
-                      />
-                    )}
-                  </LeafletRefs.current.MapContainer>
-
-                  <button type="button" onClick={requestGPSLocation} className="absolute bottom-4 left-4 z-[410] bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-full shadow-2xl border border-emerald-500/30 flex items-center justify-center"><Crosshair className={`w-5 h-5 ${geo.loading ? 'animate-spin text-amber-300' : ''}`} /></button>
-                </div>
+            <div className="w-full h-2/5 md:h-1/3 border-b border-slate-800/20 relative z-0">
+              {isMounted ? (
+                <NeshanLocationPicker
+                  initialCenter={markerPos}
+                  onLocationSelect={(coords) => setMarkerPos(coords)}
+                  darkMode={darkMode}
+                  height="100%"
+                />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-xs text-slate-400 animate-pulse">در حال فراخوانی رادار نقشه...</div>
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-xs text-slate-400 animate-pulse">در حال فراخوانی سرویس موقعیت‌یاب نشان...</div>
               )}
             </div>
 

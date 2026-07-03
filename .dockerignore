@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.gitignore
+*.sqlite
+*.db
+.env.local
+.env
+README.md

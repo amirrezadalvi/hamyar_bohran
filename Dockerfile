@@ -1,16 +1,17 @@
-# ۱. تغییر نسخه به node:20-alpine
+# استفاده از نسخه 20 که با better-sqlite3 سازگار است
 FROM node:20-alpine AS deps
 
-# نصب ابزارهای کامپایلر برای better-sqlite3
+# نصب ابزارهای لازم برای کامپایل native modules (مثل better-sqlite3)
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --only=production
 
-# ۲. تغییر نسخه به node:20-alpine در مرحله builder
+
 FROM node:20-alpine AS builder
 
+# نصب ابزارهای لازم در مرحله builder
 RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
@@ -19,7 +20,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# ۳. تغییر نسخه به node:20-alpine در مرحله runner
+
 FROM node:20-alpine AS runner
 
 WORKDIR /app

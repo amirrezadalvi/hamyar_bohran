@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;200;300;400;500;600;700;800;900&display=swap");
+
+/* Leaflet CSS */
+@import "leaflet/dist/leaflet.css";
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 2px;
+}
+
+/* Leaflet map container fixes */
+.leaflet-container {
+  background-color: #111827;
+}
+
+.leaflet-control-attribution {
+  background-color: rgba(17, 24, 39, 0.8);
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.hazard-marker {
+  filter: drop-shadow(0 0 8px #ef4444);
+  animation: pulse-glow 2s infinite;
+}
+
+.pulse-glow {
+  filter: drop-shadow(0 0 10px #ef4444);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 5px #ef4444);
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 20px #ef4444);
+  }
+}

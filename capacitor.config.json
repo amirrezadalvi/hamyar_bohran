@@ -1,0 +1,13 @@
+{
+  "appId": "ir.hamyar.bohran",
+  "appName": "همیار بحران",
+  "webDir": "out",
+  "bundledWebRuntime": false,
+  "server": {
+    "hostname": "localhost",
+    "iosScheme": "hamyar-bohran"
+  },
+  "android": {
+    "overrideUserAgent": "HamyarBohran/1.0 (Android)"
+  }
+}

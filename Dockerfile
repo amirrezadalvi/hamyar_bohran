@@ -7,18 +7,17 @@ RUN apk add --no-cache python3 make g++
 # کپی فایل‌های پیکربندی
 COPY package.json ./
 
-# نصب تمامی پکیج‌ها (dependencies و devDependencies)
-# این دستور autoprefixer را هم نصب می‌کند
+# نصب تمیز پکیج‌ها در داخل داکر
 RUN npm install
 
-# کپی کدها
+# کپی کردن کدها
 COPY . .
 
-# تنظیم حافظه و بیلد
+# بیلد
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
-# مرحله نهایی (فقط فایل‌های بیلد شده)
+# مرحله نهایی
 FROM node:18-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production

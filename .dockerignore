@@ -1,9 +1,8 @@
-
 .next
 .git
 .gitignore
-# *.sqlite  <-- این خط را کامنت یا حذف کنید
-# *.db      <-- این خط را کامنت یا حذف کنید
 .env.local
 .env
 README.md
+# این خط مهم است:
+node_modules

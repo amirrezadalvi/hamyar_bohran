@@ -104,11 +104,7 @@ export default function CrisisManagementSystem() {
     lastActiveTime: 'در حال پایش...'
   });
 
-  const [incidents, setIncidents] = useState<Incident[]>([
-    { id: 101, type: 'زلزله یا تخریب سازه', severityValue: 85, description: 'تخریب جزیی ساختمان‌های قدیمی منطقه و ترک خوردگی دیوارهای اصلی کشف شده است. (موقعیت ثبت شده: lat: 35.6942, lng: 51.4000)', reporterName: 'احسان مدنی', reporterPhone: '09123456789', lat: 35.6942, lng: 51.4000, status: 'در دست بررسی', likes: 12, dislikes: 2, assignedHamyars: [] },
-    { id: 102, type: 'بمباران / آسیب جنگی', severityValue: 95, description: 'شنیده شدن صدای انفجار مهیب در بخش شرقی حومه مسکونی پایتخت. (موقعیت ثبت شده: lat: 35.7150, lng: 51.4390)', reporterName: 'محمد کریمی', reporterPhone: '09351112233', lat: 35.7150, lng: 51.4390, status: 'تایید شده', likes: 45, dislikes: 0, assignedHamyars: [] },
-    { id: 103, type: 'آتش‌سوزی گسترده', severityValue: 40, description: 'دود شدید در یک ساختمان اداری تجاری به دلیل اتصال خازن‌های برق. (موقعیت ثبت شده: lat: 35.6700, lng: 51.3700)', reporterName: 'رضا علوی', reporterPhone: '09912201633', lat: 35.6700, lng: 51.3700, status: 'در دست بررسی', likes: 1, dislikes: 8, assignedHamyars: [] }
-  ]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
 
   // ========== VOLUNTEERS – now loaded from API ==========
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
@@ -203,6 +199,13 @@ export default function CrisisManagementSystem() {
       .catch(err => console.error('Error loading volunteers:', err));
   }, []);
 
+  // لود لایو حوادث از سرور هم‌روش
+  useEffect(() => {
+    fetch('/api/incidents')
+      .then(res => res.json())
+      .then(data => setIncidents(data))
+      .catch(err => console.error('Error loading incidents:', err));
+  }, []);
   const navigateToView = (viewName: 'report' | 'volunteer' | 'admin' | 'support' | 'admin-edit' | 'analytics') => {
     setCurrentView(viewName);
     if (typeof window !== 'undefined') {
@@ -443,33 +446,43 @@ export default function CrisisManagementSystem() {
     }
   };
 
-  const handleIncidentSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isReportPhoneVerified && !isAdminLoggedIn) { alert("❌ ابتدا باید شماره همراه خود را تایید کنید."); return; }
-    if (!isPersianName(reporterName)) { alert("❌ نام باید با حروف الفبای فارسی تایپ شود!"); return; }
+  const handleIncidentSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!isReportPhoneVerified && !isAdminLoggedIn) { alert("❌ ابتدا باید شماره همراه خود را تایید کنید."); return; }
+  if (!isPersianName(reporterName)) { alert("❌ نام باید با حروف الفبای فارسی تایپ شود!"); return; }
 
-    const finalType = crisisType === 'other' ? customCrisis : crisisType;
-    const locationString = ` (موقعیت متنی: ${incidentAddress.trim()} | مختصات ماهواره‌ای: lat: ${markerPos.lat.toFixed(4)}, lng: ${markerPos.lng.toFixed(4)})`;
-    
-    const newIncident: Incident = {
-      id: Date.now(),
-      type: finalType,
-      severityValue: severityValue,
-      description: incidentDesc + locationString,
-      reporterName: reporterName.trim(),
-      reporterPhone: reporterPhone.trim(),
-      lat: markerPos.lat,
-      lng: markerPos.lng,
-      status: isAdminLoggedIn ? 'تایید شده' : 'در دست بررسی',
-      likes: 0,
-      dislikes: 0,
-      assignedHamyars: []
-    };
-    setIncidents(prev => [newIncident, ...prev]);
-    alert(isAdminLoggedIn ? "🚨 گزارش ستادی با تایید آنی ثبت گردید." : "🚨 گزارش واقعه با موفقیت ثبت و به صف راستی‌آزمایی ستاد منتقل شد.");
-    setIncidentDesc(''); setIncidentAddress(''); setReporterName(''); setReporterPhone(''); setSeverityValue(20); setIsReportPhoneVerified(false);
-    if(isAdminLoggedIn) navigateToView('admin');
+  const finalType = crisisType === 'other' ? customCrisis : crisisType;
+  const locationString = ` (موقعیت متنی: ${incidentAddress.trim()} | مختصات ماهواره‌ای: lat: ${markerPos.lat.toFixed(4)}, lng: ${markerPos.lng.toFixed(4)})`;
+  
+  const newIncident: Incident = {
+    id: Date.now(),
+    type: finalType,
+    severityValue: severityValue,
+    description: incidentDesc + locationString,
+    reporterName: reporterName.trim(),
+    reporterPhone: reporterPhone.trim(),
+    lat: markerPos.lat,
+    lng: markerPos.lng,
+    status: isAdminLoggedIn ? 'تایید شده' : 'در دست بررسی',
+    likes: 0,
+    dislikes: 0,
+    assignedHamyars: []
   };
+
+  // آپدیت آنی و فرستادن به بک‌آند دیتابیس دائم
+  setIncidents(prev => [newIncident, ...prev]);
+  alert(isAdminLoggedIn ? "🚨 گزارش ستادی با تایید آنی ثبت گردید." : "🚨 گزارش واقعه با موفقیت ثبت و به صف راستی‌آزمایی ستاد منتقل شد.");
+  
+  setIncidentDesc(''); setIncidentAddress(''); setReporterName(''); setReporterPhone(''); setSeverityValue(20); setIsReportPhoneVerified(false);
+  if(isAdminLoggedIn) navigateToView('admin');
+
+  // ارسال فیزیکی به دیتابیس ابری
+  await fetch('/api/incidents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newIncident)
+  }).catch(err => console.error("Failed to save incident physically:", err));
+};
 
   const handleVolunteerSubmit = (e: React.FormEvent) => {
     e.preventDefault();

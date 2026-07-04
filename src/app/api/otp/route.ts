@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const { action, phone, idempotencyKey, verification_id, code } = body;
 
     // توکن ثابت پنل نویداا شما
-    const NAVIDAA_API_KEY = "navidaa_live_xxx"; // این‌جا توکن واقعی خودت را جایگزین کن
+    const NAVIDAA_API_KEY = "navidaa_live_50fdb6c228f23956277cd71d281906243ff67a66a3d4a394914b46cc4030ea4d"; // این‌جا توکن واقعی خودت را جایگزین کن
 
     // ۱. درخواست ارسال کد (Send OTP)
     if (action === 'send') {

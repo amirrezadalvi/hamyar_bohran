@@ -1,51 +1,70 @@
+// src/app/api/otp/route.ts
 import { NextResponse } from 'next/server';
 
-const NAVIDAA_API_KEY = process.env.NAVIDAA_API_KEY || '';
+export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    if (!NAVIDAA_API_KEY) {
-      return NextResponse.json({ error: "API key not configured" }, { status: 500 });
+    const body = await req.json();
+    const { action, phone, idempotencyKey, verification_id, code } = body;
+
+    // توکن ثابت پنل نویداا شما
+    const NAVIDAA_API_KEY = "navidaa_live_xxx"; // این‌جا توکن واقعی خودت را جایگزین کن
+
+    // ۱. درخواست ارسال کد (Send OTP)
+    if (action === 'send') {
+      const response = await fetch('https://api.navidaa.ir/v1/otp/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': NAVIDAA_API_KEY,
+          'Idempotency-Key': idempotencyKey // حتماً ارسال می‌شود تا مانع تکرار شود
+        },
+        body: JSON.stringify({
+          phone: String(phone).trim(),
+          channels: [
+            { channel: "bale" } // فقط کانال بله پایداری دارد و اس‌ام‌اس حذف شد
+          ],
+          channel_timeout: 60
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Navidaa gateway error status: ${response.status} - ${errorText}`);
+        return NextResponse.json({ error: 'خطا در درگاه نویداا' }, { status: response.status });
+      }
+
+      const data = await response.json();
+      return NextResponse.json({ verification_id: data.verification_id });
     }
 
-    const { action, phone, idempotencyKey, verification_id, code } = await request.json();
-
-    // بخش تایید کد ۶ رقمی
+    // ۲. تایید کد وارد شده (Verify OTP)
     if (action === 'verify') {
-      const response = await fetch("https://api.navidaa.ir/v1/otp/verify", {
-        method: "POST",
+      const response = await fetch('https://api.navidaa.ir/v1/otp/verify', {
+        method: 'POST',
         headers: {
-          "X-API-Key": NAVIDAA_API_KEY,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
+          'X-API-Key': NAVIDAA_API_KEY
         },
         body: JSON.stringify({
           verification_id: verification_id,
-          code: code.trim(),
-        }),
+          code: String(code).trim()
+        })
       });
 
-      const data = await response.json();
-      // بازگرداندن دقیق پاسخ سرور نویداا
-      return NextResponse.json(data, { status: response.status });
+      if (!response.ok) {
+        return NextResponse.json({ verified: false, error: 'کد نامعتبر یا خطا در تایید' });
+      }
+
+      const result = await response.json();
+      return NextResponse.json({ verified: result.verified });
     }
 
-    // بخش ارسال کد OTP
-    const response = await fetch("https://api.navidaa.ir/v1/otp/send", {
-      method: "POST",
-      headers: {
-        "X-API-Key": NAVIDAA_API_KEY,
-        "Content-Type": "application/json",
-        "Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify({
-        phone: phone.trim(),
-        channels: [{ channel: "bale" }]
-      }),
-    });
+    return NextResponse.json({ error: 'عملیات نامعتبر' }, { status: 400 });
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error('OTP Route Internal Error:', error);
+    return NextResponse.json({ error: 'خطای داخلی سرور پدافند' }, { status: 500 });
   }
 }

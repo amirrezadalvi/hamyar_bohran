@@ -1,8 +1,18 @@
 // src/lib/db.ts
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
-const db = new Database(path.join(process.cwd(), 'database.sqlite'));
+// آدرس‌دهی مستقیم به پوشه دیسک دائم در سرور هم‌روش
+const dbFolder = path.join(process.cwd(), 'data');
+
+// اگر پوشه data وجود نداشت، آن را بساز
+if (!fs.existsSync(dbFolder)) {
+  fs.mkdirSync(dbFolder, { recursive: true });
+}
+
+const dbPath = path.join(dbFolder, 'database.sqlite');
+const db = new Database(dbPath);
 
 // ایجاد جدول‌ها در صورت نیاز
 db.exec(`

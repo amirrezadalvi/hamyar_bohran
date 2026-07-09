@@ -2,16 +2,14 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// 🛡️ حافظه موقت ستاد برای مدیریت ترافیک و مانیتورینگ IP کاربران
+// 🛡️ حافظه موقت برای مدیریت ترافیک و ریت‌لیمیت کاربران (امنیت پروداکشن)
 const trafficCache = new Map<string, { count: number; resetTime: number }>();
-
-// تنظیمات محدودیت اختصاصی (حداکثر ۷ پیام در دقیقه برای هر فرد)
 const MAX_REQUESTS_PER_MINUTE = 7;
-const TIME_WINDOW = 60 * 1000; // ۶۰ ثانیه به میلی‌ثانیه
+const TIME_WINDOW = 60 * 1000; 
 
 export async function POST(req: Request) {
   try {
-    // ۱. استخراج آی‌پورتال (IP) کاربر برای اعمال ریت‌لیمیت هوشمند
+    // ۱. ریت‌لیمیت هوشمند بر اساس IP کاربر
     const clientIp = 
       req.headers.get('x-forwarded-for')?.split(',')[0] || 
       req.headers.get('x-real-ip') || 
@@ -20,12 +18,10 @@ export async function POST(req: Request) {
     const currentTime = Date.now();
     const userTraffic = trafficCache.get(clientIp);
 
-    // بررسی پنجره زمانی و اعمال محدودیت ترافیک
     if (!userTraffic || currentTime > userTraffic.resetTime) {
       trafficCache.set(clientIp, { count: 1, resetTime: currentTime + TIME_WINDOW });
     } else {
       if (userTraffic.count >= MAX_REQUESTS_PER_MINUTE) {
-        console.warn(`⚠️ ترافیک مشکوک و بیش از حد مجاز از آی‌پورتال مسدود شد: ${clientIp}`);
         return NextResponse.json(
           { error: 'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً ۱ دقیقه دیگر تلاش فرمایید.' },
           { status: 429 }
@@ -41,22 +37,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'تاریخچه پیام‌ها معتبر نمی‌باشد' }, { status: 400 });
     }
 
-    // خواندن امن کلید هوش مصنوعی از سیستم ریجستری
+    // خواندن امن کلید از فایل .env.local
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
 
     if (!GEMINI_API_KEY) {
-      console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی (GEMINI_API_KEY) یافت نشد.');
+      console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی در فایل محیطی تعریف نشده است.');
       return NextResponse.json({ error: 'تنظیمات سرور ناقص است' }, { status: 500 });
     }
 
-    // دستورالعمل‌های هویتی و لحن پدافندی دستیار هوشمند سامانه
     const systemInstructionText = `
       شما پشتیبان و دستیار هوشمند آنلاین و رسمی "سامانه همیار بحران" (مدیریت مردمی حوادث غیرمترقبه) هستید.
       وظیفه شما راهنمایی کاربران در حوزه‌های ثبت گزارش حوادث روی نقشه، فرم داوطلبی و فوریت‌های پزشکی اولیه است.
       لحن شما باید آرامش‌بخش، مقتدر، همدلانه، کاملاً فارسی و بسیار سریع و خلاصه باشد.
     `;
 
-    // کامپایل تاریخچه گفتگو در قالب فیلد تخت input برای فرکانس ساختار تعاملی Interactions API
+    // کامپایل تاریخچه چت در قالب یک prompt یکپارچه برای ساختار رسمی Interactions API
     let compiledInput = `System Instructions:\n${systemInstructionText}\n\nChat History:\n`;
     messages.forEach((msg: any) => {
       const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
@@ -71,9 +66,9 @@ export async function POST(req: Request) {
     
     let resData;
 
-    // 🔄 سوئیچ و مدیریت هوشمند اتمسفر شبکه (لوکال ویندوز / پروداکشن همروش)
+    // 🔄 سوئیچ هوشمند شبکه بین لوکال و سرور اصلی همروش
     if (process.env.NODE_ENV === 'development') {
-      // 💻 وضعیت لوکال: عبور ترافیک از کانال پروکسی امن Undici و پورت ۱۰۸۰۹ v2ray شما
+      // 💻 لوکال شما: فراخوانی مستقیم درگاه Interactions گوگل با ساختار استاندارد متنی ?key= از پورت 10809
       const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${GEMINI_API_KEY}`;
       const { request, ProxyAgent } = require('undici');
       
@@ -84,7 +79,7 @@ export async function POST(req: Request) {
         }
       });
       
-      console.log("▲ [Dev] ارسال درخواست تعاملی به پورت فیلترشکن لوکال 10809");
+      console.log("▲ [Dev] ارسال درخواست رسمی Interactions API به پورت فیلترشکن 10809");
       
       const response = await request(url, {
         method: 'POST',
@@ -104,8 +99,8 @@ export async function POST(req: Request) {
 
       resData = await response.body.json();
     } else {
-      // 🚀 [Prod] وضعیت پروداکشن (سرور همروش): شلیک ترافیک به درگاه شتاب‌دهنده اختصاصی کلاودفلر شما
-      const url = `https://gateway.ai.cloudflare.com/v1/b76c74f87f433f89e3f3c8f5a4f21624/hamyar-gate/google-ai/v1/interactions?key=${GEMINI_API_KEY}`;
+      // 🚀 پروداکشن همروش: شلیک ترافیک به شتاب‌دهنده کلاودفلر با اسلاگ صحیح google-ai-studio
+      const url = `https://gateway.ai.cloudflare.com/v1/b76c74f87f433f89e3f3c8f5a4f21624/hamyar-gate/google-ai-studio/v1/interactions?key=${GEMINI_API_KEY}`;
       
       console.log("🚀 [Prod] ارسال درخواست مستقیم از سرور همروش به درگاه کلاودفلر تحریم‌شکن");
       
@@ -117,14 +112,14 @@ export async function POST(req: Request) {
 
       if (!response.ok) {
         const errLog = await response.text();
-        console.error('Gemini API Error (Prod):', errLog);
-        return NextResponse.json({ error: 'خطا در پاسخ درگاه تعاملی سرور اصلی همروش' }, { status: response.status });
+        console.error('Gemini Interactions API Error (Prod):', errLog);
+        return NextResponse.json({ error: 'خطا در پاسخ درگاه تعاملی اصلی گوگل روی سرور همروش' }, { status: response.status });
       }
 
       resData = await response.json();
     }
 
-    // 🚀 استخراج دقیق دیتا از بلاک گام‌های مدل خروجی (model_output) ساختار جدید Steps گوگل
+    // 🚀 استخراج دقیق و هوشمند متن از مدل خروجی ساختار جدید Steps گوگل بر اساس داکس شما
     const modelOutputStep = resData.steps?.find((step: any) => step.type === 'model_output');
     const botReply = modelOutputStep?.content?.[0]?.text || "متأسفانه پاسخی دریافت نشد. مجدداً تلاش فرمایید.";
 

@@ -3,14 +3,14 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    let record = db.prepare('SELECT * FROM analytics WHERE id = 1').get();
+    let record = db.prepare('SELECT * FROM analytics LIMIT 1').get() as any;
     
     if (!record) {
       db.prepare(`
-        INSERT INTO analytics (id, totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime)
-        VALUES (1, 0, 0, 0, 0, '')
+        INSERT INTO analytics (totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime)
+        VALUES (0, 0, 0, 0, '')
       `).run();
-      record = db.prepare('SELECT * FROM analytics WHERE id = 1').get();
+      record = db.prepare('SELECT * FROM analytics LIMIT 1').get();
     }
     
     return NextResponse.json(record);
@@ -25,12 +25,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime } = body;
     
-    const existing = db.prepare('SELECT * FROM analytics WHERE id = 1').get();
+    const existing = db.prepare('SELECT * FROM analytics LIMIT 1').get() as any;
     
     if (!existing) {
       db.prepare(`
-        INSERT INTO analytics (id, totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime)
-        VALUES (1, ?, ?, ?, ?, ?)
+        INSERT INTO analytics (totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime)
+        VALUES (?, ?, ?, ?, ?)
       `).run(totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime);
     } else {
       db.prepare(`
@@ -40,11 +40,11 @@ export async function POST(request: Request) {
             mobileHits = ?,
             desktopHits = ?,
             lastActiveTime = ?
-        WHERE id = 1
-      `).run(totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime);
+        WHERE id = ?
+      `).run(totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime, existing.id);
     }
     
-    const updated = db.prepare('SELECT * FROM analytics WHERE id = 1').get();
+    const updated = db.prepare('SELECT * FROM analytics LIMIT 1').get();
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Error in POST /api/analytics:', error);

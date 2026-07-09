@@ -18,6 +18,9 @@ if (!fs.existsSync(dbFolder)) {
 const dbPath = path.join(dbFolder, 'database.sqlite');
 const db = new Database(dbPath);
 
+// تنظیم حالت WAL برای افزایش کارایی و جلوگیری از کراش ناخواسته در SQLite
+db.pragma('journal_mode = WAL');
+
 // ایجاد جدول‌ها در صورت نیاز
 db.exec(`
   CREATE TABLE IF NOT EXISTS volunteers (
@@ -39,8 +42,17 @@ db.exec(`
     uniqueUsers INTEGER DEFAULT 0,
     mobileHits INTEGER DEFAULT 0,
     desktopHits INTEGER DEFAULT 0,
-    lastActiveTime TEXT
+    lastActiveTime TEXT DEFAULT ''
   );
 `);
+
+// اگر جدول analytics خالی بود، یک رکورد پیش‌فرض اضافه کن
+const checkAnalytics = db.prepare('SELECT COUNT(*) as count FROM analytics').get() as { count: number };
+if (!checkAnalytics || checkAnalytics.count === 0) {
+  db.prepare(`
+    INSERT INTO analytics (totalVisVisits, uniqueUsers, mobileHits, desktopHits, lastActiveTime)
+    VALUES (0, 0, 0, 0, '')
+  `).run();
+}
 
 export default db;

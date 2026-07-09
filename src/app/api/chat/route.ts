@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'تاریخچه پیام‌ها معتبر نمی‌باشد' }, { status: 400 });
     }
 
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
+    const GEMINI_API_KEY = "AQ.Ab8RN6JkJuXUNPjfZlCBvJGkwp6nxyqlqeVfgaEUY7ZgJAOnxw..."; 
 
     if (!GEMINI_API_KEY) {
       console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی در متغیرهای محیطی یافت نشد.');

@@ -97,7 +97,7 @@ export default function CrisisManagementSystem() {
 
   const [adminProfile, setAdminProfile] = useState({
     fullName: 'امیررضا دلوی',
-    email: 'dalvi82bk@gmail.com',
+    email: 'hamyarbohran@gmail.com',
     phone: '09912201633',
     studentId: '220701057'
   });
@@ -1477,14 +1477,14 @@ export default function CrisisManagementSystem() {
               <div className={`flex justify-between items-center border-b pb-4 gap-4 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                 <div className="flex items-center gap-2 text-xs font-black"><PhoneCall className="w-4 h-4 text-red-600 shrink-0" /><span>پشتیبانی:</span></div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => handleCopyToClipboardAndToast("+989912201633")} className="p-1 rounded bg-slate-500/10 text-slate-400 hover:text-slate-200 transition"><Copy className="w-3.5 h-3.5" /></button>
-                  <a href={`tel:${adminProfile.phone}`} style={{ direction: 'ltr', unicodeBidi: 'bidi-override' }} className="dir-ltr inline-block text-left font-mono font-black text-sm md:text-base tracking-widest text-red-600 hover:underline">+989912201633</a>
+                  <button type="button" onClick={() => handleCopyToClipboardAndToast("+989226401310")} className="p-1 rounded bg-slate-500/10 text-slate-400 hover:text-slate-200 transition"><Copy className="w-3.5 h-3.5" /></button>
+                  <a href={`tel:${adminProfile.phone}`} style={{ direction: 'ltr', unicodeBidi: 'bidi-override' }} className="dir-ltr inline-block text-left font-mono font-black text-sm md:text-base tracking-widest text-red-600 hover:underline">+989226401310</a>
                 </div>
               </div>
               <div className="flex justify-between items-center gap-4 pt-1 font-black">
                 <div className="flex items-center gap-2 text-xs"><Mail className="w-4 h-4 text-red-600 shrink-0" /><span>پست الکترونیکی:</span></div>
                 <div className="flex items-center gap-2 max-w-[65%]">
-                  <button type="button" onClick={() => handleCopyToClipboardAndToast(adminProfile.email)} className="p-1 rounded bg-slate-500/10 text-slate-400 hover:text-slate-200 transition"><Copy className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => handleCopyToClipboardAndToast("hamyarbohran@gmail.com")} className="p-1 rounded bg-slate-500/10 text-slate-400 hover:text-slate-200 transition"><Copy className="w-3.5 h-3.5" /></button>
                   <a href={`mailto:${adminProfile.email}`} className="font-mono text-[11px] md:text-xs text-red-600 tracking-wide break-all hover:underline">{adminProfile.email}</a>
                 </div>
               </div>

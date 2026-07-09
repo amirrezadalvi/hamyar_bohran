@@ -81,8 +81,8 @@ export async function POST(req: Request) {
     } else {
       // وضعیت پروداکشن (سرور همروش): استفاده از درگاه واسطه برای شکستن ۴۰۳ تحریم ایران
       // نکته: اگر از درگاه پروکسی دیگری در پروداکشن استفاده می‌کنی، آدرس زیر را تغییر بده
-      const url = `https://gemini.api.proxy.ir/v1/interactions?key=${GEMINI_API_KEY}`;
       
+      const url = `https://api.v03.ir/v1/interactions?key=${GEMINI_API_KEY}`;
       console.log("🚀 [Prod] ارسال درخواست مستقیم از سرور همروش به درگاه واسطه تحریم‌شکن");
       const response = await fetch(url, {
         method: 'POST',

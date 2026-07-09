@@ -2,38 +2,22 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// 🛡️ مانیتورینگ و حافظه پدافندی برای کنترل ترافیک بر اساس IP کاربران
 const trafficCache = new Map<string, { count: number; resetTime: number }>();
-
-// تنظیمات محدودیت اختصاصی ستاد (۷ درخواست در دقیقه برای هر فرد)
 const MAX_REQUESTS_PER_MINUTE = 7;
-const TIME_WINDOW = 60 * 1000; // ۶۰ ثانیه به میلی‌ثانیه
+const TIME_WINDOW = 60 * 1000;
 
 export async function POST(req: Request) {
   try {
-    // ۱. استخراج آی‌پورتال (IP) کاربر برای اعمال محدودیت
-    const clientIp = 
-      req.headers.get('x-forwarded-for')?.split(',')[0] || 
-      req.headers.get('x-real-ip') || 
-      'anonymous_user';
-
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'anonymous_user';
     const currentTime = Date.now();
     const userTraffic = trafficCache.get(clientIp);
 
-    // بررسی و اعمال محدودیت هوشمند
     if (!userTraffic || currentTime > userTraffic.resetTime) {
-      // اگر کاربر جدید است یا زمان پنجرهٔ قبلی تمام شده، شمارنده بازنشانی می‌شود
       trafficCache.set(clientIp, { count: 1, resetTime: currentTime + TIME_WINDOW });
     } else {
-      // اگر کاربر در حال اسپم کردن است و از حد مجاز رد شده
       if (userTraffic.count >= MAX_REQUESTS_PER_MINUTE) {
-        console.warn(`⚠️ ترافیک مشکوک از آی‌پورتال مسدود شد: ${clientIp}`);
-        return NextResponse.json(
-          { error: 'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً ۱ دقیقه دیگر تلاش فرمایید.' },
-          { status: 429 } // کد وضعیت استاندارد Too Many Requests
-        );
+        return NextResponse.json({ error: 'تعداد درخواست‌ها بیش از حد مجاز است. ۱ دقیقه دیگر تلاش فرمایید.' }, { status: 429 });
       }
-      // افزودن به شمارنده درخواست‌های کاربر
       userTraffic.count++;
     }
 
@@ -47,12 +31,12 @@ export async function POST(req: Request) {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
 
     if (!GEMINI_API_KEY) {
-      console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی در فایل .env.local تعریف نشده است.');
+      console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی در متغیرهای محیطی یافت نشد.');
       return NextResponse.json({ error: 'تنظیمات سرور ناقص است' }, { status: 500 });
     }
 
     const systemInstructionText = `
-      شما پشتیبان و دستیار هوشمند آنلاین و رسمی "سامانه همیار بحران" (مدیریت مردمی حوادث غیرمترقبه) هستید.
+      شما پشتیبان و دستیار هوشمند آنلاین و رسمی "سامانه همیار بحران" هستید.
       وظیفه شما راهنمایی کاربران در حوزه‌های ثبت گزارش حوادث روی نقشه، فرم داوطلبی و فوریت‌های پزشکی اولیه است.
       لحن شما باید آرامش‌بخش، مقتدر، همدلانه، کاملاً فارسی و بسیار سریع و خلاصه باشد.
     `;
@@ -64,44 +48,41 @@ export async function POST(req: Request) {
     });
     compiledInput += `\nAssistant:`;
 
-    // تنظیم مدل روی سبک‌ترین حالت ممکن بر اساس داک جدید
     const payload = {
       model: "models/gemini-3.5-flash",
       input: compiledInput
     };
     
-    const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${GEMINI_API_KEY}`;
     let resData;
 
+    // 🔄 مدیریت هوشمند اتمسفر لوکال و سرور پروداکشن
     if (process.env.NODE_ENV === 'development') {
+      // وضعیت لوکال: متصل به پورت ۱۰۸۰۹ فیلترشکن ویندوز شما
+      const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${GEMINI_API_KEY}`;
       const { request, ProxyAgent } = require('undici');
-      
       const dispatcher = new ProxyAgent({
         uri: 'http://127.0.0.1:10809',
-        clientOptions: {
-          tls: { rejectUnauthorized: false }
-        }
+        clientOptions: { tls: { rejectUnauthorized: false } }
       });
       
+      console.log("▲ [Dev] ارسال درخواست Interactions API به پورت فیلترشکن لوکال");
       const response = await request(url, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'connection': 'close'
-        },
+        headers: { 'content-type': 'application/json', 'connection': 'close' },
         body: JSON.stringify(payload),
         dispatcher
       });
 
       if (response.statusCode !== 200) {
-        const errLog = await response.body.text();
-        console.error('Gemini Interactions API Error (Dev):', errLog);
-        return NextResponse.json({ error: 'خطا در پاسخ درگاه تعاملی گوگل' }, { status: response.statusCode });
+        return NextResponse.json({ error: 'خطا در درگاه لوکال' }, { status: response.statusCode });
       }
-
       resData = await response.body.json();
     } else {
-      // حالت سرور اصلی (همروش) بدون نیاز به پروکسی لوکال
+      // وضعیت پروداکشن (سرور همروش): استفاده از درگاه واسطه برای شکستن ۴۰۳ تحریم ایران
+      // نکته: اگر از درگاه پروکسی دیگری در پروداکشن استفاده می‌کنی، آدرس زیر را تغییر بده
+      const url = `https://gemini.api.proxy.ir/v1/interactions?key=${GEMINI_API_KEY}`;
+      
+      console.log("🚀 [Prod] ارسال درخواست مستقیم از سرور همروش به درگاه واسطه تحریم‌شکن");
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,10 +91,9 @@ export async function POST(req: Request) {
 
       if (!response.ok) {
         const errLog = await response.text();
-        console.error('Gemini Interactions API Error (Prod):', errLog);
-        return NextResponse.json({ error: 'خطا در پاسخ درگاه تعاملی اصلی گوگل' }, { status: response.status });
+        console.error('Gemini API Error (Prod):', errLog);
+        return NextResponse.json({ error: 'خطا در پاسخ درگاه سرور اصلی' }, { status: response.status });
       }
-
       resData = await response.json();
     }
 

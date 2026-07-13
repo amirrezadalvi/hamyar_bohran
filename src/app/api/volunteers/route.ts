@@ -6,16 +6,13 @@ export async function GET() {
     const stmt = db.prepare('SELECT * FROM volunteers');
     const rows = stmt.all() as any[];
     
-    // تبدیل امن رشته متنی مهارت‌ها به آرایه با مدیریت خطای کرش
     const volunteers = rows.map(row => {
       let parsedSkills: string[] = [];
       if (row.skills) {
         try {
-          // اگر متن ساختار JSON داشت (مثل آرایه متنی تبدیل شده)
           if (row.skills.trim().startsWith('[') || row.skills.trim().startsWith('{')) {
             parsedSkills = JSON.parse(row.skills);
           } else {
-            // اگر متن خام فارسی قدیمی در دیتابیس بود، آن را در قالب یک آرایه تک‌عضوی قرار می‌دهد
             parsedSkills = [row.skills.trim()];
           }
         } catch (e) {
@@ -40,18 +37,21 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const stmt = db.prepare(`
-      INSERT INTO volunteers (fullName, phone, nationalId, skills, job, address, status) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO volunteers (fullName, phone, nationalId, skills, job, address, status, gender, birthDate, city)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
       body.fullName, 
       body.phone, 
       body.nationalId, 
-      JSON.stringify(body.skills || []), // ذخیره استاندارد به صورت آرایه متنی JSON
+      JSON.stringify(body.skills || []),
       body.job, 
       body.address, 
-      'در انتظار تایید'
+      'در انتظار تایید',
+      body.gender || '',
+      body.birthDate || '',
+      body.city || ''
     );
     
     return NextResponse.json({ success: true });

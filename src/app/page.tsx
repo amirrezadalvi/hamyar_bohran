@@ -1,7 +1,5 @@
-'use client';
-
+'use client';import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Medal, Activity, Check, PhoneCall, LayoutDashboard, Lock, User, Smartphone, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Settings, Truck, Mail, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck, Copy, ChevronDown, Home, Headphones, Upload, Send, MessageSquareCode, MapPin, FileText, Crosshair } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Medal, Activity, Check, PhoneCall, LayoutDashboard, Lock, User, Smartphone, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Settings, Truck, Mail, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck, Copy, ChevronDown, Home, Headphones, Upload, Send, MessageSquareCode } from 'lucide-react';
 import NeshanLocationPicker from '@/components/NeshanLocationPicker';
 
 interface Incident {
@@ -17,6 +15,10 @@ interface Incident {
   assignedHamyars?: string[];
   likes: number; 
   dislikes: number; 
+  manualAddress?: string;
+  mapLat?: number;
+  mapLng?: number;
+  city?: string;
 }
 
 interface Volunteer {
@@ -25,12 +27,14 @@ interface Volunteer {
   phone: string;
   nationalId: string;
   gender: 'زن' | 'مرد' | '';
+  birthDate?: string;
   skills: string[];
   job: string;
   address: string;
   status: 'در انتظار تایید' | 'تایید شده' | 'رد صلاحیت شده';
   fixedPassword?: string; 
   rank?: 'امدادگر رسمی' | 'امدادگر ارشد' | 'امدادگر متخصص';
+  city?: string;
 }
 
 interface SiteAnalytics {
@@ -61,6 +65,11 @@ const checkMelliCode = (code: string): boolean => {
 
 const isPersianName = (name: string): boolean => /^[\u0600-\u06FF\s]+$/.test(name.trim()) && name.trim().length >= 3;
 const isValidIranianPhone = (phone: string): boolean => /^09\d{9}$/.test(phone.trim());
+
+// آرایه‌های تاریخ تولد شمسی
+const persianMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+const persianDays = Array.from({ length: 31 }, (_, i) => i + 1);
+const persianYears = Array.from({ length: 104 }, (_, i) => 1405 - i); // از ۱۴۰۳ تا ۱۳۰۰
 
 export default function CrisisManagementSystem() {
   const [isMounted, setIsMounted] = useState(false);
@@ -117,6 +126,7 @@ export default function CrisisManagementSystem() {
   const [customCrisis, setCustomCrisis] = useState('');
   const [incidentDesc, setIncidentDesc] = useState('');
   const [incidentAddress, setIncidentAddress] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState(''); 
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
 
@@ -124,6 +134,11 @@ export default function CrisisManagementSystem() {
   const [volPhone, setVolPhone] = useState('');
   const [volNationalId, setVolNationalId] = useState('');
   const [volGender, setVolGender] = useState<'زن' | 'مرد' | ''>('');
+  
+  const [volBirthDay, setVolBirthDay] = useState('');
+  const [volBirthMonth, setVolBirthMonth] = useState('');
+  const [volBirthYear, setVolBirthYear] = useState('');
+
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [customSkill, setCustomSkill] = useState('');
   const [volJob, setVolJob] = useState('');
@@ -147,7 +162,6 @@ export default function CrisisManagementSystem() {
   const [openFilterDropdown, setOpenFilterDropdown] = useState(false);
   const [openSortDropdown, setOpenSortDropdown] = useState(false);
 
-  // استیت‌های لایه هوش مصنوعی
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { role: 'model', content: 'سلام! من دستیار هوشمند سامانه همیار بحران هستم. چطور می‌توانم در زمینه ثبت فوریت‌های اضطراری، کمک‌های اولیه یا عضویت داوطلبان راهنمایی‌تان کنم؟' }
   ]);
@@ -157,6 +171,87 @@ export default function CrisisManagementSystem() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const analyticsFired = useRef(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  
+  const [incidentCity, setIncidentCity] = useState('');
+  const [volCity, setVolCity] = useState('');
+  // ====== تابع تبدیل مختصات به آدرس ======
+// ====== تابع تبدیل مختصات به آدرس با OpenStreetMap ======
+const fetchAddressFromCoords = async (lat: number, lng: number) => {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fa`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log("✅ OpenStreetMap Response:", data);
+    
+    // استخراج آدرس از پاسخ
+    if (data && data.display_name) {
+      return data.display_name;
+    } else if (data && data.address) {
+      // ساخت آدرس از اجزای مختلف
+      const addr = data.address;
+      const parts = [];
+      if (addr.road) parts.push(addr.road);
+      if (addr.neighbourhood) parts.push(addr.neighbourhood);
+      if (addr.suburb) parts.push(addr.suburb);
+      if (addr.city) parts.push(addr.city);
+      if (addr.state) parts.push(addr.state);
+      if (addr.country) parts.push(addr.country);
+      return parts.length > 0 ? parts.join('، ') : 'آدرس نامشخص';
+    }
+    
+    return 'آدرس نامشخص';
+  } catch (error) {
+    console.error('❌ Error fetching address:', error);
+    return 'خطا در دریافت آدرس';
+  }
+};
+
+// ====== تابع مدیریت انتخاب لوکیشن (با نگهداری آدرس دستی) ======
+// ====== تابع مدیریت انتخاب لوکیشن (فقط برای نمایش زیر نقشه) ======
+const handleLocationSelect = async (coords: { lat: number; lng: number }) => {
+  setMarkerPos(coords);
+  const address = await fetchAddressFromCoords(coords.lat, coords.lng);
+  if (address && address !== 'خطا در دریافت آدرس') {
+    setSelectedAddress(address); // فقط اینجا تنظیم می‌شود
+    // incidentAddress را تغییر نمی‌دهیم تا کاربر دستی بنویسد
+  } else {
+    setSelectedAddress('آدرس نامشخص');
+  }
+};
+
+// ====== تابع دریافت موقعیت فعلی کاربر ======
+const handleGetCurrentLocation = () => {
+  if (!navigator.geolocation) {
+    alert('مرورگر شما از موقعیت‌یابی پشتیبانی نمی‌کند.');
+    return;
+  }
+  
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const coords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
+      setMarkerPos(coords);
+      fetchAddressFromCoords(coords.lat, coords.lng).then(address => {
+        if (address && address !== 'خطا در دریافت آدرس') {
+          setSelectedAddress(address); // فقط اینجا تنظیم شود
+        }
+      });
+    },
+    (error) => {
+      console.error('Error getting location:', error);
+      alert('خطا در دریافت موقعیت. لطفاً دسترسی موقعیت را به مرورگر بدهید.');
+    },
+    { enableHighAccuracy: true }
+  );
+};
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -498,7 +593,11 @@ export default function CrisisManagementSystem() {
       status: isAdminLoggedIn ? 'تایید شده' : 'در دست بررسی',
       likes: 0,
       dislikes: 0,
-      assignedHamyars: []
+      assignedHamyars: [],
+      manualAddress: incidentAddress,   // ← اضافه کنید
+      mapLat: markerPos.lat,            // ← اضافه کنید
+      mapLng: markerPos.lng,            // ← اضافه کنید
+      city: incidentCity                // ← اضافه کنید
     };
 
     setIncidents(prev => [newIncident, ...prev]);
@@ -524,6 +623,7 @@ export default function CrisisManagementSystem() {
     if (!isPersianName(volName)) { alert("❌ نام باید صرفاً با حروف فارسی قرار بگیرد."); return; }
     if (!checkMelliCode(volNationalId)) { alert("❌ کد ملی معتبر نیست!"); return; }
     if (volGender === '') { alert("❌ لطفا جنسیت خود را انتخاب کنید."); return; }
+    if (!volBirthDay || !volBirthMonth || !volBirthYear) { alert("❌ لطفا تاریخ تولد خود را به صورت کامل (روز، ماه، سال) وارد کنید."); return; }
     if (selectedSkills.length === 0) { alert("❌ لطفا حداقل یک تخصص انتخاب کنید."); return; }
 
     const finalSkills = selectedSkills.filter(s => s !== 'other_skill');
@@ -531,14 +631,29 @@ export default function CrisisManagementSystem() {
       finalSkills.push(customSkill.trim());
     }
 
+    const birthDateStr = `${volBirthYear}/${volBirthMonth}/${volBirthDay}`;
+
     const newVolunteer: Volunteer = {
-      id: Date.now(), fullName: volName.trim(), phone: volPhone.trim(), nationalId: volNationalId.trim(), gender: volGender, skills: finalSkills, job: volJob.trim(), address: volAddress.trim(), status: 'در انتظار تایید'
+      id: Date.now(), 
+      fullName: volName.trim(), 
+      phone: volPhone.trim(), 
+      nationalId: volNationalId.trim(), 
+      gender: volGender, 
+      birthDate: birthDateStr,
+      skills: finalSkills, 
+      job: volJob.trim(), 
+      address: volAddress.trim(), 
+      status: 'در انتظار تایید',
+      city: volCity.trim()  // ← اضافه کنید
     };
 
     setVolunteers(prev => [newVolunteer, ...prev]);
     setVolSubmitErrorMsg('');
     alert("📝 فرم درخواست با موفقیت ثبت موقت شد.");
-    setVolName(''); setVolPhone(''); setVolNationalId(''); setVolGender(''); setSelectedSkills([]); setCustomSkill(''); setVolJob(''); setVolAddress(''); setIsVolPhoneVerified(false);
+    
+    setVolName(''); setVolPhone(''); setVolNationalId(''); setVolGender(''); 
+    setVolBirthDay(''); setVolBirthMonth(''); setVolBirthYear('');
+    setSelectedSkills([]); setCustomSkill(''); setVolJob(''); setVolAddress(''); setIsVolPhoneVerified(false);
 
     fetch('/api/volunteers', {
       method: 'POST',
@@ -555,22 +670,6 @@ export default function CrisisManagementSystem() {
       .catch(err => {
         console.error('Error saving volunteer:', err);
       });
-  };
-
-  const handleUpdateVolunteerInPage = (e: React.FormEvent | React.MouseEvent) => {
-    e.preventDefault();
-    if (!selectedVolForPage) return;
-    setVolunteers(prev => prev.map(v => v.id === selectedVolForPage.id ? selectedVolForPage : v));
-    alert("⚙️ اطلاعات پرونده متقاضی با موفقیت اصلاح و ثبت پایداری شد.");
-  };
-
-  const handleApproveVolunteer = (id: number, e: any) => {
-    e.preventDefault();
-    setVolunteers(prev => prev.map(v => v.id === id ? {...v, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : v));
-    alert("✅ پرونده همیار داوطلب تایید صلاحیت گردید و دسترسی سیستم صادر شد.");
-    if (selectedVolForPage && selectedVolForPage.id === id) {
-      setSelectedVolForPage(prev => prev ? { ...prev, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی' } : null);
-    }
   };
 
   const handleChangeHamyarPassword = () => {
@@ -839,7 +938,7 @@ export default function CrisisManagementSystem() {
               <div className="w-16 h-14 rounded-2xl bg-red-500/10 border border-red-500/40 flex items-center justify-center mx-auto mb-4 shadow-lg">
                 <Radio className="w-7 h-7 text-red-500 animate-pulse" />
               </div>
-              <h1 className={`text-xl md:text-3xl font-black tracking-tight mb-4 ${darkMode ? 'text-red-400' : 'text-slate-955'}`}>ستاد دیجیتال فرماندهی و مدیریت همیار بحران</h1>
+              <h1 className={`text-xl md:text-3xl font-black tracking-tight mb-4 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>ستاد دیجیتال فرماندهی و مدیریت همیار بحران</h1>
               <p className={`text-sm md:text-base max-w-2xl mx-auto leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-700 font-medium'}`}>
                 ما اینجا هستیم تا در زمان وقوع حوادث ناگهانی، مردم و نیروهای امدادی رو خیلی سریع و بدون فوت وقت به همدیگه متصل کنیم. اگر توی موقعیت اضطراری قرار گرفتید و به کمک نیاز دارید، یا اینکه خودتون تخصص دارید و مایلید به عنوان نیروی داوطلب به مردم محله‌تون خدمت کنید، این سامانه دقیقاً برای همین کار ساخته شده.
               </p>
@@ -895,7 +994,7 @@ export default function CrisisManagementSystem() {
             </div>
 
             <div className="space-y-4">
-              <h2 className={`text-base md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-955 font-black'}`}><Activity className="w-5 h-5 text-red-600" /> چرخه گردش اطلاعات و عملکرد فنی سامانه:</h2>
+              <h2 className={`text-base md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}><Activity className="w-5 h-5 text-red-600" /> چرخه گردش اطلاعات و عملکرد فنی سامانه:</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className={`border p-6 rounded-2xl space-y-3 transition shadow-md ${darkMode ? 'bg-slate-950 border-slate-800 text-red-50' : 'bg-pink-50 border-pink-200 text-slate-900 shadow-xl'}`}>
                   <div className={`w-11 h-11 rounded-xl font-mono text-lg font-black flex items-center justify-center ${darkMode ? 'bg-red-900 text-red-400 border border-red-700' : 'bg-pink-100 text-red-700 shadow'}`}>1</div>
@@ -934,99 +1033,483 @@ export default function CrisisManagementSystem() {
         )}
 
         {/* 🚨 نمای اول: ثبت گزارش حادثه */}
-        {currentView === 'report' && !isAuthMode && (
-          <div className="w-full h-full flex flex-col">
-            <div className="w-full h-2/5 md:h-1/3 border-b border-black/10 relative z-0">
-              {isMounted ? (
-                <NeshanLocationPicker initialCenter={markerPos} onLocationSelect={(coords) => setMarkerPos(coords)} darkMode={darkMode} height="100%" />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-xs text-slate-400 animate-pulse">در حال فراخوانی سرویش موقعیت‌یاب نشان...</div>
+        {/* 🚨 نمای اول: ثبت گزارش حادثه - نسخه نهایی */}
+{/* 🚨 نمای اول: ثبت گزارش حادثه - نسخه نهایی (یک نقشه) */}
+{currentView === 'report' && !isAuthMode && (
+  <div className="w-full h-full flex flex-col">
+    {/* نقشه - فقط یک بار */}
+    <div className="w-full h-2/5 md:h-1/3 border-b border-black/10 relative z-0">
+      {isMounted ? (
+        <div className="relative w-full h-full">
+          <NeshanLocationPicker 
+            initialCenter={markerPos} 
+            onLocationSelect={handleLocationSelect} 
+            darkMode={darkMode} 
+            height="100%" 
+          />
+          
+          {/* دکمه موقعیت‌یابی خودکار */}
+          <button
+            type="button"
+            onClick={handleGetCurrentLocation}
+            className="absolute bottom-4 right-4 z-[1000] p-3 rounded-full shadow-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:scale-110 transition-all duration-300"
+            title="دریافت موقعیت فعلی"
+          >
+            <Crosshair className="w-5 h-5 text-red-500" />
+          </button>
+        </div>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-xs text-slate-400 animate-pulse">
+          در حال فراخوانی سرویس موقعیت‌یاب نشان...
+        </div>
+      )}
+    </div>
+
+    {/* 📍 باکس نمایش آدرس مارک‌شده (دقیقاً زیر نقشه و بیرون از آن) */}
+    {selectedAddress && (
+      <div className="w-full px-4 py-2 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-black/5 dark:border-white/5">
+        <div className="max-w-4xl mx-auto flex items-center gap-2">
+          <span className="text-[10px] font-black text-slate-400">📍 موقعیت انتخاب‌شده:</span>
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate flex-1">
+            {selectedAddress}
+          </p>
+        </div>
+      </div>
+    )}
+
+    {/* فرم ثبت حادثه */}
+    <div className="flex-1 p-4 md:p-6 overflow-y-auto scrollbar-thin">
+      <div className={`max-w-4xl mx-auto rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl transition-all duration-300 ${
+        darkMode 
+          ? 'bg-slate-900/90 border border-slate-700/50 shadow-[0_20px_60px_rgba(0,0,0,0.5)]' 
+          : 'bg-white/90 border border-slate-200/50 shadow-[0_20px_60px_rgba(0,0,0,0.08)]'
+      }`}>
+        
+        {/* هدر فرم - اصلاح رنگ */}
+        <div className="flex items-center gap-3 border-b pb-4 mb-6 border-slate-200/20">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+            <AlertTriangle className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className={`text-lg md:text-xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>ثبت گزارش رسمی حادثه</h2>
+            <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>لطفاً اطلاعات دقیق را وارد کنید</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleIncidentSubmit} className="space-y-5">
+          {/* ردیف اول: نام و شماره همراه */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* فیلد نام */}
+            <div className="space-y-1.5">
+              <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
+                <User className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
+                نام و نام خانوادگی (فارسی)
+              </label>
+              <div className={`relative rounded-xl border transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500/30 ${
+                darkMode 
+                  ? 'border-slate-700 bg-slate-800/50 focus-within:border-red-500' 
+                  : 'border-slate-200 bg-slate-50/50 focus-within:border-red-400'
+              }`}>
+                <input
+                  type="text"
+                  required
+                  value={reporterName}
+                  onChange={(e) => setReporterName(e.target.value)}
+                  onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً نام و نام خانوادگی خود را وارد کنید.')}
+                  onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
+                  placeholder="مثلاً: علی محمدی"
+                  className={`w-full bg-transparent px-4 py-3 text-sm font-bold focus:outline-none placeholder:opacity-40 ${
+                    darkMode ? 'text-white placeholder:text-slate-400' : 'text-slate-900 placeholder:text-slate-400'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* فیلد شماره همراه */}
+            <div className="space-y-1.5">
+              <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
+                <Smartphone className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
+                شماره همراه
+              </label>
+              <div className="flex gap-2">
+                <div className={`flex-1 rounded-xl border transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500/30 ${
+                  darkMode 
+                    ? 'border-slate-700 bg-slate-800/50 focus-within:border-red-500' 
+                    : 'border-slate-200 bg-slate-50/50 focus-within:border-red-400'
+                }`}>
+                  <input
+                    type="tel"
+                    required
+                    maxLength={11}
+                    value={reporterPhone}
+                    onChange={(e) => setReporterPhone(e.target.value)}
+                    onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً شماره تماس ۱۱ رقمی را وارد کنید.')}
+                    onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
+                    placeholder="09xxxxxxxxx"
+                    className={`w-full bg-transparent px-4 py-3 text-sm font-bold font-mono dir-ltr text-left focus:outline-none placeholder:opacity-40 ${
+                      darkMode ? 'text-white placeholder:text-slate-400' : 'text-slate-900 placeholder:text-slate-400'
+                    }`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleSendReportOTP(reporterPhone, 'bale')}
+                  className="shrink-0 px-4 py-3 rounded-xl text-xs font-black bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all duration-300 hover:scale-105 active:scale-95"
+                >
+                  ارسال کد
+                </button>
+              </div>
+              {reportOtpSent && (
+          <div className="mt-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-center gap-2 animate-fadeIn w-full">
+            <span className="text-[11px] font-black text-amber-500 whitespace-nowrap">کد ۶ رقمی را وارد کنید:</span>
+            <div className="flex gap-2 w-full sm:flex-1">
+              <input
+                type="text"
+                maxLength={6}
+                value={reportOtpCode}
+                onChange={(e) => setReportOtpCode(e.target.value)}
+                className={`flex-1 text-center font-mono font-bold text-sm rounded-xl border px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
+                  darkMode 
+                    ? 'bg-slate-900 border-slate-700 text-white' 
+                    : 'bg-white border-slate-300 text-slate-900'
+                }`}
+      />
+      <button
+        type="button"
+        onClick={handleVerifyReportOTP}
+        className="px-4 py-1.5 rounded-xl text-xs font-black bg-amber-500 text-white hover:bg-amber-600 transition shadow-md whitespace-nowrap"
+      >
+        تایید
+      </button>
+    </div>
+  </div>
+)}
+              {isReportPhoneVerified && (
+                <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-500 animate-fadeIn">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>شماره همراه تأیید شد</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* آدرس (فقط ورود دستی) */}
+          <div className="space-y-1.5">
+            <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
+              <MapPin className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
+              آدرس دقیق محل وقوع حادثه
+            </label>
+            <div className={`relative rounded-xl border transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500/30 ${
+              darkMode 
+                ? 'border-slate-700 bg-slate-800/50 focus-within:border-red-500' 
+                : 'border-slate-200 bg-slate-50/50 focus-within:border-red-400'
+            }`}>
+              <input
+                type="text"
+                required
+                value={incidentAddress}
+                onChange={(e) => setIncidentAddress(e.target.value)}
+                placeholder="آدرس را دستی وارد کنید..."
+                className={`w-full bg-transparent px-4 py-3 text-sm font-bold focus:outline-none placeholder:opacity-40 ${
+                  darkMode ? 'text-white placeholder:text-slate-400' : 'text-slate-900 placeholder:text-slate-400'
+                }`}
+              />
+            </div>
+            
+            {/* فیلد شهر - ثبت حادثه */}
+            <div className="space-y-1.5 mt-3">
+              <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
+                <MapPin className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
+                شهر محل وقوع حادثه
+              </label>
+              <div className={`relative rounded-xl border transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500/30 ${
+                darkMode 
+                  ? 'border-slate-700 bg-slate-800/50 focus-within:border-red-500' 
+                  : 'border-slate-200 bg-slate-50/50 focus-within:border-red-400'
+              }`}>
+                <input
+                  type="text"
+                  required
+                  value={incidentCity}
+                  onChange={(e) => setIncidentCity(e.target.value)}
+                  placeholder="مثلاً: تهران، مشهد، اصفهان..."
+                  className={`w-full bg-transparent px-4 py-3 text-sm font-bold focus:outline-none placeholder:opacity-40 ${
+                    darkMode ? 'text-white placeholder:text-slate-400' : 'text-slate-900 placeholder:text-slate-400'
+                  }`}
+                />
+              </div>
+            </div>
+            <p className="text-[9px] font-black opacity-30">* برای مشاهده آدرس مارک‌شده روی نقشه، به باکس زیر نقشه نگاه کنید</p>
+          </div>
+
+          {/* ردیف دوم: نوع واقعه و شدت بحران */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* نوع واقعه */}
+            <div className="space-y-1.5">
+              <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
+                <Shield className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
+                نوع واقعه بحرانی
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpenCrisisDropdown(!openCrisisDropdown)}
+                  className={`w-full rounded-xl border px-4 py-3 text-sm font-bold flex items-center justify-between transition-all duration-300 ${
+                    darkMode 
+                      ? 'border-slate-700 bg-slate-800/50 hover:border-slate-600 text-white' 
+                      : 'border-slate-200 bg-slate-50/50 hover:border-slate-300 text-slate-900'
+                  }`}
+                >
+                  <span>{crisisType === 'other' ? 'سایر موارد' : crisisType}</span>
+                  <ChevronDown className={`w-4 h-4 opacity-50 transition-transform duration-300 ${openCrisisDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {openCrisisDropdown && (
+                  <div className={`absolute left-0 right-0 mt-2 rounded-xl shadow-2xl border z-50 overflow-hidden animate-fadeIn ${
+                    darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
+                  }`}>
+                    {['زلزله یا تخریب سازه', 'بمباران / آسیب جنگی', 'آتش‌سوزی گسترده', 'سیل گسترده و طغیان روان‌آب', 'other'].map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => { setCrisisType(opt); setOpenCrisisDropdown(false); }}
+                        className={`w-full text-right px-4 py-3 text-xs font-bold transition-all duration-200 ${
+                          crisisType === opt 
+                            ? 'bg-red-500/10 text-red-500' 
+                            : darkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-slate-50 text-slate-800'
+                        }`}
+                      >
+                        {opt === 'other' ? 'سایر موارد' : opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {crisisType === 'other' && (
+                <div className="mt-2 animate-fadeIn">
+                  <input
+                    type="text"
+                    required
+                    value={customCrisis}
+                    onChange={(e) => setCustomCrisis(e.target.value)}
+                    placeholder="نوع واقعه را وارد کنید..."
+                    className={`w-full rounded-xl border px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-red-500/30 ${
+                      darkMode 
+                        ? 'border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-400' 
+                        : 'border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400'
+                    }`}
+                  />
+                </div>
               )}
             </div>
 
-            <div className="w-full h-3/5 md:h-2/3 p-4 md:p-6 overflow-y-auto">
-              <form onSubmit={handleIncidentSubmit} className={`max-w-3xl mx-auto border rounded-3xl p-4 md:p-6 shadow-2xl space-y-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-300 text-slate-900'}`}>
-                <div className="flex items-center gap-2 border-b pb-2 border-black/10"><AlertTriangle className="w-5 h-5 text-red-600" /> <h2 className="text-sm md:text-base font-black">ثبت گزارش رسمی حادثه</h2></div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-[11px] font-black mb-1 block">نام و نام خانوادگی (فارسی)</label>
-                    <input type="text" required value={reporterName} onChange={(e) => setReporterName(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً نام و نام خانوادگی خود را برای ثبت حادثه وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} placeholder="" className={`w-full border rounded-xl px-4 py-2 text-xs font-bold focus:outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-black mb-1 block">شماره همراه</label>
-                    <input type="tel" required maxLength={11} placeholder="" value={reporterPhone} onChange={(e) => setReporterPhone(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً شماره تماس همراه ۱۱ رقمی خود را وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border text-left dir-ltr font-mono rounded-xl px-4 py-2 text-xs font-bold focus:outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <button type="button" onClick={() => handleSendReportOTP(reporterPhone, 'bale')} className="flex-1 bg-red-600/10 border border-red-500/30 text-red-600 text-xs font-black h-[38px] rounded-xl hover:bg-red-600/20 transition shadow-sm">ارسال از بله</button>
-                    <button type="button" onClick={() => handleSendReportOTP(reporterPhone, 'sms')} className="flex-1 bg-amber-600/10 border border-amber-500/30 text-amber-500 text-xs font-black h-[38px] rounded-xl hover:bg-amber-600/20 transition shadow-sm">ارسال از SMS</button>
-                  </div>
-                </div>
+            {/* شدت بحران */}
+            {/* شدت بحران - نسخه نهایی با جهت درست (چپ=بحرانی، راست=خفیف) */}
+{/* شدت بحران - نسخه نهایی با قابلیت کشیدن */}
+<div className="space-y-3">
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-3">
+      <div 
+        className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer hover:scale-110 ${
+          severityValue < 35 ? 'bg-emerald-500/20 text-emerald-500 border-2 border-emerald-500/30' :
+          severityValue < 70 ? 'bg-amber-500/20 text-amber-500 border-2 border-amber-500/30' :
+          'bg-red-500/20 text-red-500 border-2 border-red-500/30 animate-pulse'
+        }`}
+        onClick={() => {
+          if (severityValue < 33) setSeverityValue(50);
+          else if (severityValue < 66) setSeverityValue(85);
+          else setSeverityValue(20);
+        }}
+        title="برای تغییر سریع کلیک کنید"
+      >
+        {severityValue < 35 ? <Activity className="w-6 h-6" /> :
+         severityValue < 70 ? <AlertTriangle className="w-6 h-6" /> :
+         <ShieldAlert className="w-6 h-6" />}
+      </div>
+      <div>
+        <label className={`block text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>شدت بحران</label>
+        <span className={`text-xs font-black block leading-tight transition-colors duration-300 ${
+          severityValue < 35 ? 'text-emerald-500' :
+          severityValue < 70 ? 'text-amber-500' :
+          'text-red-500'
+        }`}>
+          {severityValue < 35 ? '🟢 خفیف' :
+           severityValue < 70 ? '🟡 متوسط' :
+           '🔴 بحرانی'}
+        </span>
+      </div>
+    </div>
+    <span className={`text-2xl font-black font-mono tracking-tight transition-colors duration-300 ${
+      severityValue < 35 ? 'text-emerald-500' :
+      severityValue < 70 ? 'text-amber-500' :
+      'text-red-500'
+    }`}>
+      {severityValue}%
+    </span>
+  </div>
 
-                {reportOtpSent && (
-                  <div className={`border p-3 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-900'}`}>
-                    <span className="text-[11px] font-black">کد ۶ رقمی دریافتی را وارد کنید:</span>
-                    <div className="flex gap-2 w-full md:w-auto">
-                      <input type="text" maxLength={6} value={reportOtpCode} onChange={(e) => setReportOtpCode(e.target.value)} className={`w-full md:w-24 border rounded-xl px-3 py-1.5 text-center text-xs font-bold focus:outline-none ${darkMode ? 'bg-slate-900 border-slate-600 text-white' : 'bg-white border-slate-300 text-slate-900'}`} />
-                      <button type="button" onClick={handleVerifyReportOTP} className="bg-red-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-red-600 transition shrink-0 shadow-sm">تایید</button>
-                    </div>
-                  </div>
-                )}
+  {/* نوار پیشرفت با قابلیت کشیدن (Drag) */}
+  <div 
+    className="relative w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden shadow-inner cursor-pointer group touch-none select-none"
+    onMouseDown={(e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percent = Math.min(100, Math.max(0, Math.round((x / rect.width) * 100)));
+      setSeverityValue(100 - percent);
+      
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const newRect = e.currentTarget?.getBoundingClientRect();
+        if (!newRect) return;
+        const newX = moveEvent.clientX - newRect.left;
+        const newPercent = Math.min(100, Math.max(0, Math.round((newX / newRect.width) * 100)));
+        setSeverityValue(100 - newPercent);
+      };
+      
+      const handleMouseUp = () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }}
+    onTouchStart={(e) => {
+      const touch = e.touches[0];
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const percent = Math.min(100, Math.max(0, Math.round((x / rect.width) * 100)));
+      setSeverityValue(100 - percent);
+      
+      const handleTouchMove = (moveEvent: TouchEvent) => {
+        const touchMove = moveEvent.touches[0];
+        const newRect = e.currentTarget?.getBoundingClientRect();
+        if (!newRect) return;
+        const newX = touchMove.clientX - newRect.left;
+        const newPercent = Math.min(100, Math.max(0, Math.round((newX / newRect.width) * 100)));
+        setSeverityValue(100 - newPercent);
+      };
+      
+      const handleTouchEnd = () => {
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+      
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+    }}
+    onClick={(e) => {
+      // برای سازگاری با کلیک معمولی (در صورت عدم کشیدن)
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percent = Math.min(100, Math.max(0, Math.round((x / rect.width) * 100)));
+      setSeverityValue(100 - percent);
+    }}
+  >
+    <div 
+      className="h-full rounded-full transition-all duration-500 ease-in-out relative pointer-events-none"
+      style={{ 
+        width: `${severityValue}%`,
+        background: `linear-gradient(90deg, 
+          ${severityValue < 35 ? '#10b981' : 
+            severityValue < 70 ? '#f59e0b' : 
+            '#ef4444'}, 
+          ${severityValue < 35 ? '#34d399' : 
+            severityValue < 70 ? '#fbbf24' : 
+            '#f87171'}
+        )`,
+        boxShadow: `0 0 20px ${
+          severityValue < 35 ? 'rgba(16,185,129,0.3)' :
+          severityValue < 70 ? 'rgba(245,158,11,0.3)' :
+          'rgba(239,68,68,0.4)'
+        }`
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" style={{ width: '30%', left: '10%', borderRadius: '50%' }} />
+    </div>
 
-                <div>
-                  <label className="block text-[11px] font-black mb-1">🏠 آدرس دقیق محل وقوع حادثه</label>
-                  <input type="text" required value={incidentAddress} onChange={(e) => setIncidentAddress(e.target.value)} placeholder="تهران، میدان آزادی، ..." className={`w-full border rounded-xl px-4 py-2 text-xs font-bold focus:outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
-                </div>
+    <div 
+      className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white border-2 shadow-lg pointer-events-none transition-all duration-500 ease-in-out"
+      style={{ 
+        left: `calc(${100 - severityValue}% - 10px)`,
+        borderColor: severityValue < 35 ? '#10b981' : severityValue < 70 ? '#f59e0b' : '#ef4444',
+        boxShadow: `0 0 12px ${
+          severityValue < 35 ? 'rgba(16,185,129,0.3)' :
+          severityValue < 70 ? 'rgba(245,158,11,0.3)' :
+          'rgba(239,68,68,0.4)'
+        }`
+      }}
+    />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <label className="block text-[11px] font-black mb-1">نوع واقعه بحرانی</label>
-                    <button type="button" onClick={() => setOpenCrisisDropdown(!openCrisisDropdown)} className={`w-full border rounded-xl px-3 py-2 text-xs font-bold focus:outline-none flex items-center justify-between transition-colors ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}>
-                      <span>{crisisType === 'other' ? 'سایر موارد (Other)' : crisisType}</span>
-                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openCrisisDropdown ? 'rotate-180' : ''}`} />
-                    </button>
-                    {openCrisisDropdown && (
-                      <div className={`absolute left-0 right-0 mt-1 rounded-xl shadow-2xl border z-50 overflow-hidden ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-                        {['زلزله یا تخریب سازه', 'بمباران / آسیب جنگی', 'آتش‌سوزی گسترده', 'سیل گسترده و طغیان روان‌آب', 'other'].map((opt) => (
-                          <button key={opt} type="button" onClick={() => { setCrisisType(opt); setOpenCrisisDropdown(false); }} className={`w-full text-right px-4 py-2.5 text-xs font-bold transition-colors ${darkMode ? 'hover:bg-slate-700 text-slate-100' : 'hover:bg-slate-50 text-slate-900'} ${crisisType === opt ? 'bg-red-500/10 text-red-500 font-black' : ''}`}>
-                            {opt === 'other' ? 'سایر موارد (Other)' : opt}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="block text-[11px] font-black">تخمین شدت بحران</label>
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded text-white font-mono" style={{ backgroundColor: severityColor }}>{severityValue}%</span>
-                    </div>
-                    <div className={`flex items-center border rounded-xl px-4 h-[38px] relative overflow-hidden ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`}>
-                      <div className="absolute right-0 top-0 bottom-0 transition-all duration-150 opacity-40" style={{ width: `${severityValue}%`, backgroundColor: severityColor }} />
-                      <input type="range" min="0" max="100" value={severityValue} onChange={(e) => setSeverityValue(Number(e.target.value))} className="w-full appearance-none cursor-pointer accent-current z-10 relative" style={{ color: severityColor }} />
-                    </div>
-                  </div>
-                </div>
+    <div 
+      className="absolute top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-red-500/10 pointer-events-none transition-all duration-300 opacity-0 group-hover:opacity-100"
+      style={{ left: `calc(${100 - severityValue}% - 16px)` }}
+    />
+  </div>
 
-                {crisisType === 'other' && (
-                  <div>
-                    <label className="block text-[11px] font-black mb-1">✍️ نوع واقعه بحرانی متفرقه را بنویسید</label>
-                    <input type="text" required value={customCrisis} onChange={(e) => setCustomCrisis(e.target.value)} placeholder="مثلاً: طوفان شن" className={`w-full border rounded-xl px-4 py-2 text-xs font-bold focus:outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
-                  </div>
-                )}
+  <div className="flex justify-between text-[9px] font-black opacity-40 px-0.5">
+    <span>بحرانی</span>
+    <span>متوسط</span>
+    <span>خفیف</span>
+  </div>
+</div>
+          </div>
 
-                <div>
-                  <label className="block text-[11px] font-black mb-1">شرح حادثه و وضعیت مصدومین ثانویه</label>
-                  <textarea rows={3} required value={incidentDesc} onChange={(e) => setIncidentDesc(e.target.value)} onInvalid={(e) => { if ((e.target as HTMLTextAreaElement).value.length === 0) { (e.target as HTMLTextAreaElement).setCustomValidity('لطفاً شرح حادثه و وضعیت مصدومین را پر کنید.'); } }} placeholder="" className={`w-full border rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none resize-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
-                </div>
-
-                <button type="submit" disabled={!isReportPhoneVerified && !isAdminLoggedIn} className={`w-full text-xs font-black rounded-xl py-3 transition shadow-md flex items-center justify-center gap-2 ${isReportPhoneVerified || isAdminLoggedIn ? 'bg-gradient-to-r from-red-600 to-red-500 text-white cursor-pointer' : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'}`}>
-                  <ShieldAlert className="w-4 h-4" /> <span>{isReportPhoneVerified || isAdminLoggedIn ? 'ارسال فوری گزارش به ستاد فرماندهی' : 'لطفاً ابتدا شماره همراه خود را احراز هویت کنید'}</span>
-                </button>
-              </form>
+          {/* شرح حادثه */}
+          <div className="space-y-1.5">
+            <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
+              <FileText className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
+              شرح حادثه و وضعیت مصدومین
+            </label>
+            <div className={`relative rounded-xl border transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500/30 ${
+              darkMode 
+                ? 'border-slate-700 bg-slate-800/50 focus-within:border-red-500' 
+                : 'border-slate-200 bg-slate-50/50 focus-within:border-red-400'
+            }`}>
+              <textarea
+                rows={3}
+                required
+                value={incidentDesc}
+                onChange={(e) => setIncidentDesc(e.target.value)}
+                onInvalid={(e) => {
+                  if ((e.target as HTMLTextAreaElement).value.length === 0) {
+                    (e.target as HTMLTextAreaElement).setCustomValidity('لطفاً شرح حادثه را کامل کنید.');
+                  }
+                }}
+                onInput={(e) => (e.target as HTMLTextAreaElement).setCustomValidity('')}
+                placeholder="توضیحات کامل درباره حادثه، تعداد مصدومین، نیازهای فوری..."
+                className={`w-full bg-transparent px-4 py-3 text-sm font-semibold focus:outline-none resize-none placeholder:opacity-40 min-h-[80px] ${
+                  darkMode ? 'text-white placeholder:text-slate-400' : 'text-slate-900 placeholder:text-slate-400'
+                }`}
+              />
             </div>
           </div>
-        )}
+
+          {/* دکمه ارسال */}
+          <button
+            type="submit"
+            disabled={!isReportPhoneVerified && !isAdminLoggedIn}
+            className={`w-full relative overflow-hidden text-sm font-black rounded-2xl py-4 transition-all duration-300 flex items-center justify-center gap-2 ${
+              isReportPhoneVerified || isAdminLoggedIn
+                ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.02] active:scale-95 cursor-pointer'
+                : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
+            }`}
+          >
+            <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            <ShieldAlert className="w-5 h-5" />
+            {isReportPhoneVerified || isAdminLoggedIn ? 'ارسال فوری گزارش به ستاد فرماندهی' : 'لطفاً ابتدا شماره همراه خود را احراز هویت کنید'}
+          </button>
+
+          {/* پیام وضعیت */}
+          {isAdminLoggedIn && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-black">
+              <ShieldCheck className="w-4 h-4" />
+              <span>شما با مجوز مدیر ارشد هستید - گزارش‌ها بدون نیاز به تأیید ثبت می‌شوند</span>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* 📝 نمای دوم: درخواست عضویت داوطلبان */}
         {currentView === 'volunteer' && !isAuthMode && (
@@ -1061,27 +1544,84 @@ export default function CrisisManagementSystem() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[11px] font-black mb-1">📱 شماره همراه</label>
-                  <div className="flex flex-col gap-1.5">
-                    <input type="tel" required placeholder="09xxxxxxxxx" maxLength={11} value={volPhone} onChange={(e) => setVolPhone(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً شماره همراه متقاضی را برای ارسال کد وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border text-left dir-ltr font-mono rounded-xl px-3 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
-                    <div className="flex gap-1.5">
-                      <button type="button" onClick={() => handleSendVolOTP(volPhone, 'bale')} disabled={volCooldown} className={`flex-1 text-xs font-black py-2 rounded-xl transition shadow-sm ${volCooldown ? 'bg-gray-500 text-gray-300 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}>ارسال با بله</button>
-                      <button type="button" onClick={() => handleSendVolOTP(volPhone, 'sms')} disabled={volCooldown} className={`flex-1 text-xs font-black py-2 rounded-xl transition shadow-sm ${volCooldown ? 'bg-gray-500 text-gray-300 cursor-not-allowed' : 'bg-slate-600 text-white hover:bg-slate-700'}`}>ارسال با SMS</button>
-                    </div>
-                    {volCooldown && (
-                      <div className="text-xs text-red-500 font-black mt-0.5">⏳ ارسال مجدد کد: {volCooldownSeconds} ثانیه</div>
-                    )}
-                  </div>
+              {/* بخش جدید: تاریخ تولد */}
+              <div>
+                <label className="block text-[11px] font-black mb-1">📅 تاریخ تولد (شمسی)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <select 
+                    required 
+                    value={volBirthDay} 
+                    onChange={(e) => setVolBirthDay(e.target.value)} 
+                    className={`w-full border rounded-xl px-2 py-2 text-xs font-bold focus:outline-none appearance-none cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+                  >
+                    <option value="">روز</option>
+                    {persianDays.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  
+                  <select 
+                    required 
+                    value={volBirthMonth} 
+                    onChange={(e) => setVolBirthMonth(e.target.value)} 
+                    className={`w-full border rounded-xl px-2 py-2 text-xs font-bold focus:outline-none appearance-none cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+                  >
+                    <option value="">ماه</option>
+                    {persianMonths.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  
+                  <select 
+                    required 
+                    value={volBirthYear} 
+                    onChange={(e) => setVolBirthYear(e.target.value)} 
+                    className={`w-full border rounded-xl px-2 py-2 text-xs font-bold focus:outline-none appearance-none cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+                  >
+                    <option value="">سال</option>
+                    {persianYears.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
                 <div>
                   <label className="block text-[11px] font-black mb-1">💼 شغل فعلی</label>
                   <input type="text" required value={volJob} onChange={(e) => setVolJob(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً فرم مربوط به شغل فعلی خود را پر کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black mb-1">🏠 محل سکونت / آدرس دقیق</label>
+                  <label className="block text-[11px] font-black mb-1">🏠 آدرس دقیق</label>
                   <input type="text" required value={volAddress} onChange={(e) => setVolAddress(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً آدرس دقیق محل سکونت خود را پر کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                </div>
+                {/* فیلد شهر - ثبت داوطلب */}
+<div>
+  <label className="block text-[11px] font-black mb-1">🏙️ شهر محل سکونت</label>
+  <input
+    type="text"
+    required
+    value={volCity}
+    onChange={(e) => setVolCity(e.target.value)}
+    placeholder="مثلاً: تهران، مشهد، اصفهان..."
+    className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${
+      darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+    }`}
+  />
+</div>
+                <div>
+                  <label className="block text-[11px] font-black mb-1">📱 شماره همراه</label>
+                  <div className="flex flex-col gap-1.5">
+                    <input type="tel" required placeholder="09xxxxxxxxx" maxLength={11} value={volPhone} onChange={(e) => setVolPhone(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً شماره همراه متقاضی را برای ارسال کد وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border text-left dir-ltr font-mono rounded-xl px-3 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => handleSendVolOTP(volPhone, 'bale')} disabled={volCooldown} className={`flex-1 text-xs font-black py-2 rounded-xl transition shadow-sm ${volCooldown ? 'bg-gray-500 text-gray-300 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}>ارسال کد تایید به بله</button>
+                      
+                    </div>
+                    {volCooldown && (
+                      <div className="text-xs text-red-500 font-black mt-0.5">⏳ ارسال مجدد کد: {volCooldownSeconds} ثانیه</div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1195,6 +1735,14 @@ export default function CrisisManagementSystem() {
                     <label className="block font-black mb-1">شغل فعلی:</label>
                     <input type="text" value={selectedVolForPage.job || ''} onChange={(e) => setSelectedVolForPage({...selectedVolForPage, job: e.target.value})} className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
                   </div>
+                  <div>
+                    <label className="block font-black mb-1">جنسیت متقاضی:</label>
+                    <input type="text" readOnly value={selectedVolForPage.gender || 'ثبت نشده'} className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none font-bold opacity-80 cursor-not-allowed ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-300'}`} />
+                  </div>
+                  <div>
+                    <label className="block font-black mb-1">تاریخ تولد ثبت شده:</label>
+                    <input type="text" readOnly value={selectedVolForPage.birthDate || 'ثبت نشده'} className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none font-bold opacity-80 cursor-not-allowed ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-100 border-slate-300'}`} />
+                  </div>
                   <div className="md:col-span-2">
                     <label className="block font-black mb-1">آدرس محل سکونت دقیق:</label>
                     <input type="text" value={selectedVolForPage.address || ''} onChange={(e) => setSelectedVolForPage({...selectedVolForPage, address: e.target.value})} className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300'}`} />
@@ -1214,9 +1762,73 @@ export default function CrisisManagementSystem() {
                     </div>
                   </div>
                   <div className="md:col-span-2 flex justify-between items-center border-t pt-4 border-black/10 gap-2">
-                    <div className="flex gap-2">
-                      <button type="button" onClick={(e) => handleUpdateVolunteerInPage(e)} className="bg-red-600 text-white px-4 py-2 rounded-xl font-black transition shadow">ذخیره تغییرات داوطلب</button>
-                      <button type="button" onClick={(e) => handleApproveVolunteer(selectedVolForPage.id, e)} className="bg-red-700 text-white px-4 py-2 rounded-xl font-black transition shadow">تایید صلاحیت نهایی</button>
+                    <div className="flex gap-2 flex-wrap">
+                      <button 
+                        type="button" 
+                        onClick={async () => {
+                          const updatedData = {
+                            fullName: selectedVolForPage.fullName,
+                            phone: selectedVolForPage.phone,
+                            nationalId: selectedVolForPage.nationalId,
+                            job: selectedVolForPage.job,
+                            address: selectedVolForPage.address,
+                            skills: selectedVolForPage.skills,
+                            gender: selectedVolForPage.gender,
+                            birthDate: selectedVolForPage.birthDate,
+                            status: selectedVolForPage.status
+                          };
+                          
+                          try {
+                            const res = await fetch(`/api/volunteers/${selectedVolForPage.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(updatedData)
+                            });
+                            
+                            if (res.ok) {
+                              setVolunteers(prev => prev.map(v => v.id === selectedVolForPage.id ? selectedVolForPage : v));
+                              const updated = await fetch('/api/volunteers').then(r => r.json());
+                              setVolunteers(updated);
+                              setSelectedVolForPage(prev => prev ? {...prev, ...updatedData} : null);
+                              alert('✅ اطلاعات داوطلب با موفقیت ذخیره شد.');
+                            } else {
+                              alert('❌ خطا در ذخیره تغییرات');
+                            }
+                          } catch (e) {
+                            alert('❌ خطای شبکه');
+                          }
+                        }} 
+                        className="bg-red-600 text-white px-4 py-2 rounded-xl font-black transition shadow"
+                      >
+                        ذخیره تغییرات داوطلب
+                      </button>
+
+                      <button 
+                        type="button" 
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/volunteers/${selectedVolForPage.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'تایید شده' })
+                            });
+                            if (res.ok) {
+                              setVolunteers(prev => prev.map(v => v.id === selectedVolForPage.id ? {...v, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : v));
+                              const updated = await fetch('/api/volunteers').then(r => r.json());
+                              setVolunteers(updated);
+                              setSelectedVolForPage(prev => prev ? {...prev, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : null);
+                              alert('✅ پرونده همیار داوطلب تایید صلاحیت گردید و دسترسی سیستم صادر شد.');
+                            } else {
+                              alert('❌ خطا در تایید صلاحیت');
+                            }
+                          } catch (e) {
+                            alert('❌ خطای شبکه');
+                          }
+                        }} 
+                        className="bg-red-700 text-white px-4 py-2 rounded-xl font-black transition shadow"
+                      >
+                        تایید صلاحیت نهایی
+                      </button>
                     </div>
                     <span className="text-[11px] font-black bg-red-500/20 text-red-600 px-3 py-1 rounded-xl">وضعیت پرونده: {selectedVolForPage.status}</span>
                   </div>
@@ -1359,7 +1971,10 @@ export default function CrisisManagementSystem() {
                           <p className="text-xs leading-relaxed min-h-[35px] font-bold">{inc.description}</p>
                           
                           <div className="flex flex-col gap-1 text-[10px] font-bold">
+                            <div className="text-slate-400">📍 آدرس دستی کاربر: {inc.manualAddress || 'ثبت نشده'}</div>
+                            <div className="text-slate-400">🗺️ موقعیت نقشه: lat: {inc.mapLat || inc.lat}, lng: {inc.mapLng || inc.lng}</div>
                             <div className="text-red-600 font-sans">وضعیت: {inc.status}</div>
+                            <div className="text-slate-400">🏙️ شهر: {inc.city || 'ثبت نشده'}</div>
                             {inc.assignedHamyars && inc.assignedHamyars.length > 0 && (
                               <div className="text-red-700 font-sans">💂‍♂️ اعزام شده: ({inc.assignedHamyars.join(' ، ')})</div>
                             )}
@@ -1377,8 +1992,51 @@ export default function CrisisManagementSystem() {
 
                           {isAdminLoggedIn && (
                             <div className={`flex gap-2 pt-2 border-t ${darkMode ? 'border-slate-700' : 'border-black/5'}`}>
-                              <button type="button" onClick={() => setIncidents(prev => prev.map(i => i.id === inc.id ? {...i, status: 'تایید شده'} : i))} className="flex-1 bg-red-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow">تایید ستاد</button>
-                              <button type="button" onClick={() => setIncidents(prev => prev.filter(i => i.id !== inc.id))} className="flex-1 bg-slate-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow">حذف گزارش</button>
+                              <button 
+                                type="button" 
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/incidents/${inc.id}/status`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ status: 'تایید شده' })
+                                    });
+                                    if (res.ok) {
+                                      setIncidents(prev => prev.map(i => i.id === inc.id ? {...i, status: 'تایید شده'} : i));
+                                      const updated = await fetch('/api/incidents').then(r => r.json());
+                                      setIncidents(updated);
+                                    } else {
+                                      alert('خطا در تایید حادثه');
+                                    }
+                                  } catch (e) {
+                                    alert('خطای شبکه');
+                                  }
+                                }} 
+                                className="flex-1 bg-red-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow"
+                              >
+                                تایید ستاد
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={async () => {
+                                  if (!confirm('آیا از حذف این گزارش اطمینان دارید؟')) return;
+                                  try {
+                                    const res = await fetch(`/api/incidents/${inc.id}`, { method: 'DELETE' });
+                                    if (res.ok) {
+                                      setIncidents(prev => prev.filter(i => i.id !== inc.id));
+                                      const updated = await fetch('/api/incidents').then(r => r.json());
+                                      setIncidents(updated);
+                                    } else {
+                                      alert('خطا در حذف حادثه');
+                                    }
+                                  } catch (e) {
+                                    alert('خطای شبکه');
+                                  }
+                                }} 
+                                className="flex-1 bg-slate-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow"
+                              >
+                                حذف گزارش
+                              </button>
                             </div>
                           )}
                         </div>
@@ -1395,6 +2053,7 @@ export default function CrisisManagementSystem() {
                           <tr className={`border-b font-bold ${darkMode ? 'text-zinc-300 bg-slate-800/40 border-slate-700' : 'text-slate-800 bg-slate-100 border-slate-200'}`}>
                             <th className="p-3">نام متقاضی</th>
                             <th className="p-3">جنسیت</th>
+                            <th className="p-3">شهر</th>
                             <th className="p-3">شماره همراه</th>
                             <th className="p-3">وضعیت</th>
                             <th className="p-3 text-center">اقدام سریع</th>
@@ -1405,11 +2064,66 @@ export default function CrisisManagementSystem() {
                             <tr key={vol.id} className={darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
                               <td className="p-3 font-black"><button type="button" onClick={() => setSelectedVolForPage(vol)} className="text-red-600 hover:underline flex items-center gap-1 font-black"><Eye className="w-3 h-3" /> <span>{vol.fullName}</span></button></td>
                               <td className="p-3 font-bold">{vol.gender || '-'}</td>
+                              <td className="p-3 font-bold">{vol.city || '-'}</td>
                               <td className="p-3 font-mono font-bold">{vol.phone}</td>
                               <td className="p-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500/20 text-red-700">{vol.status}</span></td>
                               <td className="p-3 flex justify-center gap-2">
-                                <button type="button" onClick={(e) => handleApproveVolunteer(vol.id, e)} className="bg-red-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] shadow">تایید</button>
-                                <button type="button" onClick={() => setVolunteers(prev => prev.map(v => v.id === vol.id ? {...v, status: 'رد صلاحیت شده'} : v))} className="bg-slate-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] shadow">رد</button>
+                                <button 
+                                  type="button" 
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/volunteers/${vol.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: 'تایید شده' })
+                                      });
+                                      if (res.ok) {
+                                        setVolunteers(prev => prev.map(v => v.id === vol.id ? {...v, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : v));
+                                        const updated = await fetch('/api/volunteers').then(r => r.json());
+                                        setVolunteers(updated);
+                                        if (selectedVolForPage && selectedVolForPage.id === vol.id) {
+                                          setSelectedVolForPage(prev => prev ? {...prev, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : null);
+                                        }
+                                        alert('✅ پرونده همیار داوطلب تایید صلاحیت گردید و دسترسی سیستم صادر شد.');
+                                      } else {
+                                        alert('خطا در تایید داوطلب');
+                                      }
+                                    } catch (e) {
+                                      alert('خطای شبکه');
+                                    }
+                                  }} 
+                                  className="bg-red-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] shadow"
+                                >
+                                  تایید
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(`/api/volunteers/${vol.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: 'رد صلاحیت شده' })
+                                      });
+                                      if (res.ok) {
+                                        setVolunteers(prev => prev.map(v => v.id === vol.id ? {...v, status: 'رد صلاحیت شده'} : v));
+                                        const updated = await fetch('/api/volunteers').then(r => r.json());
+                                        setVolunteers(updated);
+                                        if (selectedVolForPage && selectedVolForPage.id === vol.id) {
+                                          setSelectedVolForPage(prev => prev ? {...prev, status: 'رد صلاحیت شده'} : null);
+                                        }
+                                        alert('✅ وضعیت داوطلب به «رد صلاحیت شده» تغییر یافت.');
+                                      } else {
+                                        alert('خطا در رد داوطلب');
+                                      }
+                                    } catch (e) {
+                                      alert('خطای شبکه');
+                                    }
+                                  }} 
+                                  className="bg-slate-600 text-white px-2 py-0.5 rounded-lg font-black text-[10px] shadow"
+                                >
+                                  رد
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1495,7 +2209,6 @@ export default function CrisisManagementSystem() {
         {/* 🤖 نمای ششم: پورتال لایو چت و پشتیبانی آنلاین ۲۴ ساعته با هوش مصنوعی */}
         {currentView === 'support-ai' && !isAuthMode && (
           <div className="w-full h-full p-3 md:p-6 flex flex-col justify-between overflow-hidden animate-fadeIn">
-            {/* هدر چت‌بات */}
             <div className={`border-b pb-3 flex items-center justify-between ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
@@ -1509,7 +2222,6 @@ export default function CrisisManagementSystem() {
               <button onClick={() => navigateToView('home')} className="text-slate-400 hover:text-red-500 text-xs font-bold transition">✖ خروج از چت</button>
             </div>
 
-            {/* بدنه و تاریخچه مسیج‌ها */}
             <div className="flex-1 overflow-y-auto py-4 space-y-4 px-2 scrollbar-thin">
               {chatMessages.map((msg, index) => (
                 <div key={index} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
@@ -1526,8 +2238,6 @@ export default function CrisisManagementSystem() {
                   </div>
                 </div>
               ))}
-
-              {/* انیمیشن لودینگ و فکری هوش مصنوعی */}
               {isChatLoading && (
                 <div className="flex w-full justify-start animate-pulse">
                   <div className={`rounded-2xl px-4 py-3 text-xs font-black flex items-center gap-1.5 ${darkMode ? 'bg-slate-950/40 text-cyan-400 border border-slate-800' : 'bg-cyan-50 text-cyan-600 border border-cyan-100'}`}>
@@ -1541,7 +2251,6 @@ export default function CrisisManagementSystem() {
               <div ref={chatBottomRef} />
             </div>
 
-            {/* ورودی متنی چت */}
             <form onSubmit={handleSendChatMessage} className={`border p-2 rounded-2xl flex items-center gap-2 backdrop-blur-xl ${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-white border-slate-300 shadow-lg'}`}>
               <input 
                 type="text" 
@@ -1567,6 +2276,7 @@ export default function CrisisManagementSystem() {
         )}
 
         {/* 🔐 لایه جدید: فرم تاکتیکال احراز هویت */}
+                {/* 🔐 لایه جدید: فرم تاکتیکال احراز هویت */}
         {isAuthMode && !isAdminLoggedIn && !isHamyarLoggedIn && (
           <div className="w-full h-full p-4 md:p-8 flex flex-col items-center justify-center overflow-y-auto animate-fadeIn">
             <form onSubmit={handleAdminAuth} className={`w-full max-w-md border rounded-3xl p-6 space-y-4 shadow-2xl transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-300 text-slate-900'}`}>
@@ -1591,8 +2301,8 @@ export default function CrisisManagementSystem() {
                 <div className="space-y-3">
                   {!authOtpSent ? (
                     <div className="flex gap-2 w-full">
-                      <button type="button" onClick={handleSendAuthOTP} className="flex-1 bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-black py-2 rounded-xl hover:bg-red-500/20 transition">ارسال کد از طریق بله</button>
-                      <button type="button" onClick={() => alert('به‌زودی فعال می‌شود')} className="flex-1 bg-slate-700/10 border border-slate-500/30 text-slate-400 text-xs font-black py-2 rounded-xl hover:bg-slate-700/20 transition">ارسال کد از طریق SMS</button>
+                      <button type="button" onClick={handleSendAuthOTP} className="flex-1 bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-black py-2 rounded-xl hover:bg-red-500/20 transition">ارسال کد تایید به بله</button>
+                      
                     </div>
                   ) : (
                     <div className="space-y-2 animate-fadeIn">
@@ -1609,8 +2319,7 @@ export default function CrisisManagementSystem() {
             </form>
           </div>
         )}
-
-      </section>
+        </section>
     </main>
   );
 }

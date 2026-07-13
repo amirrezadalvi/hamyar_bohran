@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 // 🛡️ حافظه موقت برای مدیریت ترافیک و ریت‌لیمیت کاربران (امنیت پروداکشن)
 const trafficCache = new Map<string, { count: number; resetTime: number }>();
-const MAX_REQUESTS_PER_MINUTE = 7;
+const MAX_REQUESTS_PER_MINUTE = 30; // 👈 ارتقا به ۳۰ درخواست جهت جلوگیری از بلاک شدن زودهنگام در زمان تست
 const TIME_WINDOW = 60 * 1000; 
 
 export async function POST(req: Request) {
@@ -37,23 +37,48 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'تاریخچه پیام‌ها معتبر نمی‌باشد' }, { status: 400 });
     }
 
-    // خواندن امن کلید از فایل .env.local
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY; 
+    // 🛡️ استراتژی خشاب ۴ کلیده: خواندن ۴ کلید از پنل همروش یا فایل لوکال
+    const keysPool = [
+      process.env.GEMINI_API_KEY,   // اکانت اول
+      process.env.GEMINI_API_KEY_2, // اکانت دوم
+      process.env.GEMINI_API_KEY_3, // اکانت سوم
+      process.env.GEMINI_API_KEY_4, // اکانت چهارم
+    ].filter(Boolean); // کلیدهای خالی را نادیده می‌گیرد
 
-    if (!GEMINI_API_KEY) {
+    if (keysPool.length === 0) {
       console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی در فایل محیطی تعریف نشده است.');
       return NextResponse.json({ error: 'تنظیمات سرور ناقص است' }, { status: 500 });
     }
 
+    // انتخاب رندوم یک کلید برای تقسیم فشار ترافیک و جلوگیری از لیمیت روزانه
+    const ACTIVE_API_KEY = keysPool[Math.floor(Math.random() * keysPool.length)];
+
+    // 🛑 گاردریل (حصار امنیتی): محدود کردن شدید هوش مصنوعی فقط به تخصص‌های سامانه
     const systemInstructionText = `
       شما پشتیبان و دستیار هوشمند آنلاین و رسمی "سامانه همیار بحران" (مدیریت مردمی حوادث غیرمترقبه) هستید.
-      وظیفه شما راهنمایی کاربران در حوزه‌های ثبت گزارش حوادث روی نقشه، فرم داوطلبی و فوریت‌های پزشکی اولیه است.
-      لحن شما باید آرامش‌بخش، مقتدر، همدلانه، کاملاً فارسی و بسیار سریع و خلاصه باشد.
+      
+      وظایف و حوزه‌های مجاز پاسخگویی شما (فقط و فقط):
+      ۱. راهنمایی کاربران برای استفاده از امکانات سامانه (ثبت گزارش، فرم داوطلبی، کارتابل و غیره).
+      ۲. فوریت‌های پزشکی، امداد و نجات اولیه و اقدامات حیاتی در حوادث (زلزله، آتش‌سوزی، تصادفات و...).
+      ۳. مدیریت بحران و پدافند غیرعامل.
+      ۴. حمایت‌های روان‌شناختی، آرامش‌بخشی به قربانیان و کنترل استرس در شرایط اضطراری.
+
+      قوانین امنیتی و محدودیت‌های مطلق (Guardrails):
+      شما مطلقاً اجازه ندارید به سوالات خارج از حوزه‌های بالا پاسخ دهید. 
+      پاسخگویی به سوالات برنامه‌نویسی (کدنویسی، بهبود کد، دیباگ)، ریاضیات، فیزیک، تاریخ، سرگرمی، جوک، مسائل سیاسی، ترجمه متون نامربوط و هرگونه سوال متفرقه اکیداً ممنوع است.
+      
+      اگر کاربری سوال متفرقه‌ای پرسید که خارج از چارچوب بالا بود، تحت هیچ شرایطی جواب سوال را ندهید و فقط و فقط از این الگوی ثابت استفاده کنید:
+      "من دستیار تخصصی سامانه همیار بحران هستم و وظیفه‌ام صرفاً راهنمایی در زمینه فوریت‌های پزشکی، امداد اولیه، حمایت‌های روان‌شناختی و استفاده از سامانه است. متأسفانه قادر به پاسخگویی به این نوع سوالات متفرقه نیستم."
+
+      لحن شما: مقتدر، آرامش‌بخش، همدلانه، کاملاً فارسی و بسیار سریع و خلاصه باشد.
     `;
+
+    // ✂️ کات کردن تاریخچه: فقط ۶ پیام آخر را برای کاهش مصرف سهمیه به گوگل می‌فرستیم
+    const recentMessages = messages.slice(-6);
 
     // کامپایل تاریخچه چت در قالب یک prompt یکپارچه برای ساختار رسمی Interactions API
     let compiledInput = `System Instructions:\n${systemInstructionText}\n\nChat History:\n`;
-    messages.forEach((msg: any) => {
+    recentMessages.forEach((msg: any) => {
       const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
       compiledInput += `${roleLabel}: ${msg.content}\n`;
     });
@@ -68,8 +93,8 @@ export async function POST(req: Request) {
 
     // 🔄 سوئیچ هوشمند شبکه بین لوکال و سرور اصلی همروش
     if (process.env.NODE_ENV === 'development') {
-      // 💻 لوکال شما: فراخوانی مستقیم درگاه Interactions گوگل با ساختار استاندارد متنی ?key= از پورت 10809
-      const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${GEMINI_API_KEY}`;
+      // 💻 لوکال شما: فراخوانی مستقیم درگاه Interactions گوگل با کلید چرخشی فعال
+      const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${ACTIVE_API_KEY}`;
       const { request, ProxyAgent } = require('undici');
       
       const dispatcher = new ProxyAgent({
@@ -79,7 +104,7 @@ export async function POST(req: Request) {
         }
       });
       
-      console.log("▲ [Dev] ارسال درخواست رسمی Interactions API به پورت فیلترشکن 10809");
+      console.log("▲ [Dev] ارسال درخواست رسمی Interactions API با سیستم Key Rotation");
       
       const response = await request(url, {
         method: 'POST',
@@ -99,8 +124,8 @@ export async function POST(req: Request) {
 
       resData = await response.body.json();
     } else {
-      // 🚀 پروداکشن همروش: شلیک ترافیک به شتاب‌دهنده کلاودفلر با اسلاگ صحیح google-ai-studio
-      const url = `https://gateway.ai.cloudflare.com/v1/b76c74f87f433f89e3f3c8f5a4f21624/hamyar-gate/google-ai-studio/v1/interactions?key=${GEMINI_API_KEY}`;
+      // 🚀 پروداکشن همروش: شلیک ترافیک به شتاب‌دهنده کلاودفلر با کلید چرخشی فعال
+      const url = `https://gateway.ai.cloudflare.com/v1/b76c74f87f433f89e3f3c8f5a4f21624/hamyar-gate/google-ai-studio/v1/interactions?key=${ACTIVE_API_KEY}`;
       
       console.log("🚀 [Prod] ارسال درخواست مستقیم از سرور همروش به درگاه کلاودفلر تحریم‌شکن");
       

@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { sendNavidaaMessage } from '@/lib/navidaa';
+import { readSession } from '@/lib/auth';
+import { notifyApprovedVolunteersForIncident } from '@/lib/incident-city-notifications';
 
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    if (readSession()?.role !== 'senior_admin') {
+      return NextResponse.json({ error: 'فقط مدیر ارشد اجازه تغییر وضعیت حادثه را دارد.' }, { status: 403 });
+    }
     const id = parseInt(params.id);
     if (isNaN(id)) {
       return NextResponse.json({ error: 'شناسه نامعتبر' }, { status: 400 });
@@ -15,8 +19,16 @@ export async function PATCH(
     const body = await req.json();
     const { status } = body;
 
-    if (!status) {
+    const allowedStatuses = ['در دست بررسی', 'تایید شده', 'رد صلاحیت شده', 'تحت کنترل همیار (اعزام نیرو)'];
+    if (!allowedStatuses.includes(status)) {
       return NextResponse.json({ error: 'وضعیت جدید ارسال نشده' }, { status: 400 });
+    }
+
+    const incidentBeforeUpdate = db.prepare('SELECT status, city FROM incidents WHERE id = ?').get(id) as
+      | { status: string; city: string }
+      | undefined;
+    if (!incidentBeforeUpdate) {
+      return NextResponse.json({ error: 'حادثه یافت نشد' }, { status: 404 });
     }
 
     const stmt = db.prepare('UPDATE incidents SET status = ? WHERE id = ?');
@@ -26,40 +38,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'حادثه یافت نشد' }, { status: 404 });
     }
 
-    // ✅ فقط در صورت تایید شدن حادثه، پیامک بر اساس شهر ارسال شود
-    if (status === 'تایید شده') {
-      const incident = db.prepare('SELECT * FROM incidents WHERE id = ?').get(id) as any;
-      
-      if (incident && incident.city) {
-        // ✅ فیلتر داوطلبان بر اساس شهر
-        const volunteers = db
-          .prepare('SELECT phone, fullName FROM volunteers WHERE status = ? AND city = ?')
-          .all('تایید شده', incident.city) as any[];
-        
-        console.log(`🔍 Found ${volunteers.length} approved volunteers in city: ${incident.city}`);
-
-        if (volunteers.length > 0) {
-          const shortDesc = incident.description.length > 60 
-            ? incident.description.substring(0, 60) + '...' 
-            : incident.description;
-
-          const messageText = `🚨 فراخوان همیار بحران 🚨\nنوع حادثه: ${incident.type}\nموقعیت: ${shortDesc}\nهمیار گرامی، لطفاً به کارتابل مراجعه کنید(تست برای سایت و اموزش بوده مسیولیت پیام کاملا بر عهده شخص بنده هست).`;
-
-          volunteers.forEach((vol) => {
-            console.log(`📤 Sending notification to volunteer: ${vol.fullName} (${vol.phone})`);
-            sendNavidaaMessage(vol.phone, messageText)
-              .then(res => console.log(`✅ Notification Response for ${vol.phone}:`, res))
-              .catch(err => console.error(`❌ Notification Error for ${vol.phone}:`, err));
-          });
-        } else {
-          console.log(`⚠️ No approved volunteers found in city: ${incident.city}`);
-        }
-      } else {
-        console.log('⚠️ Incident has no city specified. SMS broadcast skipped.');
-      }
+    if (status !== 'تایید شده' && status !== 'تحت کنترل همیار (اعزام نیرو)') {
+      db.prepare('UPDATE incident_assignments SET active = 0 WHERE incidentId = ?').run(id);
     }
 
-    return NextResponse.json({ success: true });
+    const cityNotifications = status === 'تایید شده' && incidentBeforeUpdate.status !== 'تایید شده'
+      ? await notifyApprovedVolunteersForIncident(id, incidentBeforeUpdate.city)
+      : { failed: 0 };
+
+    return NextResponse.json({
+      success: true,
+      warning: cityNotifications.failed > 0
+        ? 'حادثه تأیید شد، اما ارسال اعلان به برخی همیاران شهر ناموفق بود.'
+        : undefined
+    });
   } catch (error) {
     console.error('❌ PATCH incident status error:', error);
     return NextResponse.json({ error: 'خطای سرور' }, { status: 500 });

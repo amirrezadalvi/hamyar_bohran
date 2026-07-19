@@ -1,4 +1,9 @@
 import { NextResponse } from 'next/server';
+import {
+  getConfiguredGeminiKeys,
+  getGeminiKeyOrder,
+  isRetryableGeminiFailure
+} from '@/lib/gemini-key-fallback';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,20 +43,12 @@ export async function POST(req: Request) {
     }
 
     // 🛡️ استراتژی خشاب ۴ کلیده: خواندن ۴ کلید از پنل همروش یا فایل لوکال
-    const keysPool = [
-      process.env.GEMINI_API_KEY,   // اکانت اول
-      process.env.GEMINI_API_KEY_2, // اکانت دوم
-      process.env.GEMINI_API_KEY_3, // اکانت سوم
-      process.env.GEMINI_API_KEY_4, // اکانت چهارم
-    ].filter(Boolean); // کلیدهای خالی را نادیده می‌گیرد
+    const keysPool = getConfiguredGeminiKeys();
 
     if (keysPool.length === 0) {
       console.error('تنظیمات سیستم ناقص است: کلید هوش مصنوعی در فایل محیطی تعریف نشده است.');
       return NextResponse.json({ error: 'تنظیمات سرور ناقص است' }, { status: 500 });
     }
-
-    // انتخاب رندوم یک کلید برای تقسیم فشار ترافیک و جلوگیری از لیمیت روزانه
-    const ACTIVE_API_KEY = keysPool[Math.floor(Math.random() * keysPool.length)];
 
     // 🛑 گاردریل (حصار امنیتی): محدود کردن شدید هوش مصنوعی فقط به تخصص‌های سامانه
     const systemInstructionText = `
@@ -89,59 +86,74 @@ export async function POST(req: Request) {
       input: compiledInput
     };
     
-    let resData;
+    let resData: any = null;
+    let lastFailureStatus = 502;
+    const rotationSeed = `${clientIp}:${Math.floor(currentTime / TIME_WINDOW)}`;
+    const keyOrder = getGeminiKeyOrder(rotationSeed, keysPool);
 
-    // 🔄 سوئیچ هوشمند شبکه بین لوکال و سرور اصلی همروش
-    if (process.env.NODE_ENV === 'development') {
-      // 💻 لوکال شما: فراخوانی مستقیم درگاه Interactions گوگل با کلید چرخشی فعال
-      const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${ACTIVE_API_KEY}`;
-      const { request, ProxyAgent } = require('undici');
-      
-      const dispatcher = new ProxyAgent({
-        uri: 'http://127.0.0.1:10809',
-        clientOptions: {
-          tls: { rejectUnauthorized: false }
+    for (const { key: activeApiKey, index: keyIndex } of keyOrder) {
+      console.info(`Gemini provider attempt using configured key index ${keyIndex + 1}`);
+
+      let status: number;
+      let responseText = '';
+      if (process.env.NODE_ENV === 'development') {
+        const url = `https://generativelanguage.googleapis.com/v1/interactions?key=${activeApiKey}`;
+        const { request, ProxyAgent } = require('undici');
+        const dispatcher = new ProxyAgent({
+          uri: 'http://127.0.0.1:10809',
+          clientOptions: { tls: { rejectUnauthorized: false } }
+        });
+        try {
+          const response = await request(url, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'connection': 'close' },
+            body: JSON.stringify(payload),
+            dispatcher
+          });
+          status = response.statusCode;
+          if (status === 200) {
+            resData = await response.body.json();
+            break;
+          }
+          responseText = await response.body.text();
+        } catch {
+          status = 503;
+          responseText = 'temporarily unavailable';
         }
-      });
-      
-      console.log("▲ [Dev] ارسال درخواست رسمی Interactions API با سیستم Key Rotation");
-      
-      const response = await request(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'connection': 'close'
-        },
-        body: JSON.stringify(payload),
-        dispatcher
-      });
-
-      if (response.statusCode !== 200) {
-        const errLog = await response.body.text();
-        console.error('Gemini Interactions API Error (Dev):', errLog);
-        return NextResponse.json({ error: 'خطا در پاسخ درگاه تعاملی گوگل در محیط لوکال' }, { status: response.statusCode });
+      } else {
+        const url = `https://gateway.ai.cloudflare.com/v1/b76c74f87f433f89e3f3c8f5a4f21624/hamyar-gate/google-ai-studio/v1/interactions?key=${activeApiKey}`;
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          status = response.status;
+          if (response.ok) {
+            resData = await response.json();
+            break;
+          }
+          responseText = await response.text();
+        } catch {
+          status = 503;
+          responseText = 'temporarily unavailable';
+        }
       }
 
-      resData = await response.body.json();
-    } else {
-      // 🚀 پروداکشن همروش: شلیک ترافیک به شتاب‌دهنده کلاودفلر با کلید چرخشی فعال
-      const url = `https://gateway.ai.cloudflare.com/v1/b76c74f87f433f89e3f3c8f5a4f21624/hamyar-gate/google-ai-studio/v1/interactions?key=${ACTIVE_API_KEY}`;
-      
-      console.log("🚀 [Prod] ارسال درخواست مستقیم از سرور همروش به درگاه کلاودفلر تحریم‌شکن");
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errLog = await response.text();
-        console.error('Gemini Interactions API Error (Prod):', errLog);
-        return NextResponse.json({ error: 'خطا در پاسخ درگاه تعاملی اصلی گوگل روی سرور همروش' }, { status: response.status });
+      lastFailureStatus = status;
+      if (!isRetryableGeminiFailure(status, responseText)) {
+        return NextResponse.json(
+          { error: 'خطا در پاسخ درگاه هوش مصنوعی' },
+          { status }
+        );
       }
+    }
 
-      resData = await response.json();
+    if (!resData) {
+      return NextResponse.json(
+        { error: 'در حال حاضر همه مسیرهای سرویس هوش مصنوعی با محدودیت موقت مواجه هستند.' },
+        { status: lastFailureStatus }
+      );
     }
 
     // 🚀 استخراج دقیق و هوشمند متن از مدل خروجی ساختار جدید Steps گوگل بر اساس داکس شما

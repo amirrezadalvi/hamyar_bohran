@@ -37,6 +37,7 @@ export default function NeshanLocationPicker({
   const [selectedCoords, setSelectedCoords] = useState<LocationCoords>(initialCenter);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const gpsRequestPendingRef = useRef(false);
 
   const tileUrl = apiKey
     ? `https://api.neshan.org/v1/tile?key=${apiKey}&z={z}&x={x}&y={y}`
@@ -86,6 +87,7 @@ export default function NeshanLocationPicker({
       marker.on('dragend', function () {
         const pos = marker.getLatLng();
         const coords = { lat: pos.lat, lng: pos.lng };
+        setMode('manual');
         setSelectedCoords(coords);
         onLocationSelect?.(coords);
       });
@@ -94,6 +96,7 @@ export default function NeshanLocationPicker({
         if (mode === 'manual') {
           const coords = { lat: e.latlng.lat, lng: e.latlng.lng };
           marker.setLatLng([coords.lat, coords.lng]);
+          setMode('manual');
           setSelectedCoords(coords);
           onLocationSelect?.(coords);
         }
@@ -132,67 +135,96 @@ export default function NeshanLocationPicker({
     }
   }, [apiKey]);
 
-  const handleMapClick = useCallback((e: any) => {
-    if (!markerRef.current || mode !== 'manual') return;
-    const coords = { lat: e.latlng.lat, lng: e.latlng.lng };
-    markerRef.current.setLatLng([coords.lat, coords.lng]);
-    setSelectedCoords(coords);
-    onLocationSelect?.(coords);
-  }, [mode, onLocationSelect]);
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current) return;
+    markerRef.current.setLatLng([initialCenter.lat, initialCenter.lng]);
+    setSelectedCoords(initialCenter);
+  }, [initialCenter.lat, initialCenter.lng]);
 
-  const handleGetCurrentLocation = useCallback(() => {
+  const handleGetCurrentLocation = useCallback(async () => {
+    if (gpsRequestPendingRef.current) return;
     if (!navigator.geolocation) {
-      setGpsError('مرورگر شما از موقعیت‌یابی پشتیبانی نمی‌کند');
+      setGpsError('مرورگر شما از دریافت موقعیت مکانی پشتیبانی نمیکند.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      const isLanHttp = window.location.protocol === 'http:'
+        && !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+      setGpsError(isLanHttp
+        ? 'دریافت موقعیت مکانی در مرورگر تلفن همراه به اتصال امن HTTPS نیاز دارد. localhost روی همان دستگاه یا نسخه HTTPS را استفاده کنید.'
+        : 'دریافت موقعیت مکانی به HTTPS یا localhost نیاز دارد.');
+      return;
+    }
+    if (window.self !== window.top) {
+      setGpsError('دریافت موقعیت مکانی در این قاب ممکن نیست؛ صفحه را مستقیماً باز کنید یا دسترسی geolocation را برای iframe فعال کنید.');
       return;
     }
 
+    gpsRequestPendingRef.current = true;
     setGpsLoading(true);
     setGpsError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords: LocationCoords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-
-        setSelectedCoords(coords);
-        onLocationSelect?.(coords);
-
-        if (mapRef.current) {
-          mapRef.current.setView([coords.lat, coords.lng], 16);
-        }
-
-        if (markerRef.current) {
-          markerRef.current.setLatLng([coords.lat, coords.lng]);
-        }
-
-        setGpsLoading(false);
-        setMode('gps');
-      },
-      (error) => {
-        setGpsLoading(false);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setGpsError('دسترسی به موقعیت مکانی رد شد. لطفاً از طریق تنظیمات مرورگر مجوز را فعال کنید.');
-            break;
-          case error.POSITION_UNAVAILABLE:
-            setGpsError('موقعیت مکانی در دسترس نیست. لطفاً از حالت دستی استفاده کنید.');
-            break;
-          case error.TIMEOUT:
-            setGpsError('درخواست موقعیت مکانی با تأخیر مواجه شد. دوباره تلاش کنید.');
-            break;
-          default:
-            setGpsError('خطا در دریافت موقعیت مکانی');
-            break;
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+    const finish = () => {
+      gpsRequestPendingRef.current = false;
+      setGpsLoading(false);
+    };
+    const showPositionError = (error: GeolocationPositionError) => {
+      finish();
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          setGpsError('دسترسی موقعیت مکانی داده نشد. لطفاً دسترسی Location را در تنظیمات مرورگر فعال کنید.');
+          break;
+        case error.POSITION_UNAVAILABLE:
+          setGpsError('موقعیت فعلی دستگاه در دسترس نیست. GPS یا سرویس موقعیت مکانی دستگاه را بررسی کنید.');
+          break;
+        case error.TIMEOUT:
+          setGpsError('دریافت موقعیت بیش از حد طول کشید. دوباره تلاش کنید یا موقعیت را دستی روی نقشه انتخاب کنید.');
+          break;
+        default:
+          setGpsError('موقعیت فعلی دستگاه در دسترس نیست. GPS یا سرویس موقعیت مکانی دستگاه را بررسی کنید.');
       }
+    };
+    const acceptPosition = (position: GeolocationPosition) => {
+      const coords: LocationCoords = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
+      setSelectedCoords(coords);
+      onLocationSelect?.(coords);
+      mapRef.current?.setView([coords.lat, coords.lng], 16);
+      markerRef.current?.setLatLng([coords.lat, coords.lng]);
+      setMode('gps');
+      finish();
+    };
+    const requestPosition = () => navigator.geolocation.getCurrentPosition(
+      acceptPosition,
+      (error) => {
+        if (error.code !== error.PERMISSION_DENIED) {
+          navigator.geolocation.getCurrentPosition(
+            acceptPosition,
+            showPositionError,
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+          );
+          return;
+        }
+        showPositionError(error);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     );
+
+    try {
+      if (navigator.permissions?.query) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        if (permission.state === 'denied') {
+          finish();
+          setGpsError('دسترسی موقعیت مکانی قبلاً در مرورگر مسدود شده است. از تنظیمات سایت مرورگر، دسترسی Location را روی Allow قرار دهید و دوباره تلاش کنید.');
+          return;
+        }
+      }
+      requestPosition();
+    } catch {
+      requestPosition();
+    }
   }, [onLocationSelect]);
 
   const toggleMode = useCallback((newMode: PickerMode) => {
@@ -250,7 +282,7 @@ export default function NeshanLocationPicker({
         <button
           type="button"
           onClick={handleGetCurrentLocation}
-          disabled={gpsLoading}
+          disabled={gpsLoading || !isMapReady}
           className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all shadow-lg border backdrop-blur-sm flex items-center gap-1.5 ${
             mode === 'gps'
               ? 'bg-amber-600 border-amber-500 text-white shadow-amber-600/20'

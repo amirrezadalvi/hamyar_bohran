@@ -1,6 +1,8 @@
-'use client';import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Medal, Activity, Check, PhoneCall, LayoutDashboard, Lock, User, Smartphone, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Settings, Truck, Mail, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck, Copy, ChevronDown, Home, Headphones, Upload, Send, MessageSquareCode, MapPin, FileText, Crosshair } from 'lucide-react';
+'use client';import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Medal, Activity, Check, PhoneCall, LayoutDashboard, Lock, User, Smartphone, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Settings, Truck, Mail, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck, Copy, ChevronDown, Home, Headphones, Upload, Send, MessageSquareCode, MapPin, FileText } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import NeshanLocationPicker from '@/components/NeshanLocationPicker';
+import HomepageCircularStatistics, { type HomepageStatistics } from '@/components/HomepageCircularStatistics';
+import { IRANIAN_CITIES } from '@/lib/cities';
 
 interface Incident {
   id: number;
@@ -32,9 +34,17 @@ interface Volunteer {
   job: string;
   address: string;
   status: 'در انتظار تایید' | 'تایید شده' | 'رد صلاحیت شده';
-  fixedPassword?: string; 
   rank?: 'امدادگر رسمی' | 'امدادگر ارشد' | 'امدادگر متخصص';
   city?: string;
+  documents?: VolunteerDocument[];
+}
+
+interface VolunteerDocument {
+  id: number;
+  originalName: string;
+  contentType: string;
+  size: number;
+  uploadedAt?: string;
 }
 
 interface SiteAnalytics {
@@ -72,6 +82,9 @@ const persianDays = Array.from({ length: 31 }, (_, i) => i + 1);
 const persianYears = Array.from({ length: 104 }, (_, i) => 1405 - i); // از ۱۴۰۳ تا ۱۳۰۰
 
 export default function CrisisManagementSystem() {
+    // 🟢 این استیت‌ها را به بخش استیت‌های بالای کامپوننت اضافه کن:
+const [showMissionModal, setShowMissionModal] = useState(false);
+const [selectedIncidentForMission, setSelectedIncidentForMission] = useState<Incident | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [currentView, setCurrentView] = useState<'home' | 'report' | 'volunteer' | 'admin' | 'support' | 'admin-edit' | 'analytics' | 'support-ai'>('home');
   const [severityValue, setSeverityValue] = useState<number>(20);
@@ -99,10 +112,14 @@ export default function CrisisManagementSystem() {
   const [sortBy, setSortBy] = useState<'newest' | 'critical'>('newest');
 
   const [bannedPhones, setBannedPhones] = useState<string[]>(['09120000000']);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
-
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [passwordChangeLoading, setPasswordChangeLoading] = useState(false);
+// 🟢 این بلوک را جایگزین خط تعریف pendingMissionIncidentId کن:
   const [pendingMissionIncidentId, setPendingMissionIncidentId] = useState<number | null>(null);
-  const [volSubmitErrorMsg, setVolSubmitErrorMsg] = useState('');
+  const [missionAgreementChecked, setMissionAgreementChecked] = useState(false);
+  const [missionLoading, setMissionLoading] = useState(false);  const [volSubmitErrorMsg, setVolSubmitErrorMsg] = useState('');
 
   const [adminProfile, setAdminProfile] = useState({
     fullName: 'امیررضا دلوی',
@@ -120,13 +137,19 @@ export default function CrisisManagementSystem() {
   });
 
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [incidentsLoading, setIncidentsLoading] = useState(true);
+  const [incidentsLoadError, setIncidentsLoadError] = useState(false);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [homepageStatistics, setHomepageStatistics] = useState<HomepageStatistics | null>(null);
+  const [homepageStatisticsError, setHomepageStatisticsError] = useState(false);
 
   const [crisisType, setCrisisType] = useState('زلزله یا تخریب سازه');
   const [customCrisis, setCustomCrisis] = useState('');
   const [incidentDesc, setIncidentDesc] = useState('');
   const [incidentAddress, setIncidentAddress] = useState('');
+  const [isIncidentSubmitting, setIsIncidentSubmitting] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(''); 
+  const [isAddressResolving, setIsAddressResolving] = useState(false);
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
 
@@ -143,6 +166,11 @@ export default function CrisisManagementSystem() {
   const [customSkill, setCustomSkill] = useState('');
   const [volJob, setVolJob] = useState('');
   const [volAddress, setVolAddress] = useState('');
+  const [volDocument, setVolDocument] = useState<VolunteerDocument | null>(null);
+  const [volDocumentUploading, setVolDocumentUploading] = useState(false);
+  const [volDocumentError, setVolDocumentError] = useState('');
+  const [volDocumentMaxSize, setVolDocumentMaxSize] = useState(30 * 1024 * 1024);
+  const [volDocumentMaxSizeMb, setVolDocumentMaxSizeMb] = useState(30);
 
   const [reportOtpSent, setReportOtpSent] = useState(false);
   const [reportOtpCode, setReportOtpCode] = useState('');
@@ -159,6 +187,8 @@ export default function CrisisManagementSystem() {
 
   const [openCrisisDropdown, setOpenCrisisDropdown] = useState(false);
   const [openGenderDropdown, setOpenGenderDropdown] = useState(false);
+  const [openBirthDropdown, setOpenBirthDropdown] = useState<'day' | 'month' | 'year' | null>(null);
+  const [openCityDropdown, setOpenCityDropdown] = useState(false);
   const [openFilterDropdown, setOpenFilterDropdown] = useState(false);
   const [openSortDropdown, setOpenSortDropdown] = useState(false);
 
@@ -171,87 +201,147 @@ export default function CrisisManagementSystem() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const analyticsFired = useRef(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const geocodeRequestRef = useRef(0);
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geocodeAbortRef = useRef<AbortController | null>(null);
+  const geocodeCacheRef = useRef(new Map<string, { city: string; address: string }>());
   
   const [incidentCity, setIncidentCity] = useState('');
   const [volCity, setVolCity] = useState('');
+
+  const refreshIncidents = async () => {
+    setIncidentsLoading(true);
+    try {
+      const response = await fetch('/api/incidents', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch incidents');
+      setIncidents(await response.json());
+      setIncidentsLoadError(false);
+    } catch (error) {
+      setIncidentsLoadError(true);
+      throw error;
+    } finally {
+      setIncidentsLoading(false);
+    }
+  };
+
+  const refreshVolunteers = async () => {
+    const response = await fetch('/api/volunteers');
+    if (!response.ok) throw new Error('Failed to fetch volunteers');
+    setVolunteers(await response.json());
+  };
+
+  const refreshHomepageStatistics = async () => {
+    try {
+      const response = await fetch('/api/statistics', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch homepage statistics');
+      const data = await response.json();
+      if (
+        !Number.isInteger(data.registeredVolunteers) ||
+        !Number.isInteger(data.approvedVolunteers) ||
+        !Number.isInteger(data.rejectedVolunteers) ||
+        !Number.isInteger(data.registeredIncidents) ||
+        !Number.isInteger(data.approvedIncidents) ||
+        !Number.isInteger(data.rejectedIncidents) ||
+        !Number.isInteger(data.coveredCities)
+      ) {
+        throw new Error('Invalid homepage statistics response');
+      }
+      setHomepageStatistics({
+        registeredVolunteers: data.registeredVolunteers,
+        approvedVolunteers: data.approvedVolunteers,
+        rejectedVolunteers: data.rejectedVolunteers,
+        registeredIncidents: data.registeredIncidents,
+        approvedIncidents: data.approvedIncidents,
+        rejectedIncidents: data.rejectedIncidents,
+        coveredCities: data.coveredCities
+      });
+      setHomepageStatisticsError(false);
+    } catch (error) {
+      console.error('Error loading homepage statistics:', error);
+      setHomepageStatisticsError(true);
+    }
+  };
+
+  const getIncidentMapUrl = (incident: Incident) => {
+    const lat = Number(incident.mapLat ?? incident.lat);
+    const lng = Number(incident.mapLng ?? incident.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng)
+      ? `https://www.google.com/maps?q=${lat},${lng}`
+      : null;
+  };
+
+  const volunteerFieldClass = `w-full rounded-xl border px-4 py-3 text-sm font-bold outline-none transition-all focus:ring-2 focus:ring-red-500/30 ${
+    darkMode
+      ? 'border-slate-700 bg-slate-800/50 text-white focus:border-red-500 placeholder:text-slate-500'
+      : 'border-slate-200 bg-slate-50/50 text-slate-900 focus:border-red-400 placeholder:text-slate-400'
+  }`;
   // ====== تابع تبدیل مختصات به آدرس ======
 // ====== تابع تبدیل مختصات به آدرس با OpenStreetMap ======
-const fetchAddressFromCoords = async (lat: number, lng: number) => {
+const fetchAddressFromCoords = async (lat: number, lng: number, signal: AbortSignal) => {
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fa`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
+    const response = await fetch('/api/geocode/reverse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng }),
+      signal
+    });
+    if (!response.ok) return null;
     const data = await response.json();
-    console.log("✅ OpenStreetMap Response:", data);
-    
-    // استخراج آدرس از پاسخ
-    if (data && data.display_name) {
-      return data.display_name;
-    } else if (data && data.address) {
-      // ساخت آدرس از اجزای مختلف
-      const addr = data.address;
-      const parts = [];
-      if (addr.road) parts.push(addr.road);
-      if (addr.neighbourhood) parts.push(addr.neighbourhood);
-      if (addr.suburb) parts.push(addr.suburb);
-      if (addr.city) parts.push(addr.city);
-      if (addr.state) parts.push(addr.state);
-      if (addr.country) parts.push(addr.country);
-      return parts.length > 0 ? parts.join('، ') : 'آدرس نامشخص';
-    }
-    
-    return 'آدرس نامشخص';
+    return data?.city && data?.address
+      ? {
+          city: String(data.city),
+          address: String(data.address),
+          providerAvailable: data.providerAvailable !== false
+        }
+      : null;
   } catch (error) {
-    console.error('❌ Error fetching address:', error);
-    return 'خطا در دریافت آدرس';
+    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      console.error('Reverse geocoding failed temporarily');
+    }
+    return null;
   }
 };
 
 // ====== تابع مدیریت انتخاب لوکیشن (با نگهداری آدرس دستی) ======
 // ====== تابع مدیریت انتخاب لوکیشن (فقط برای نمایش زیر نقشه) ======
-const handleLocationSelect = async (coords: { lat: number; lng: number }) => {
+const handleLocationSelect = (coords: { lat: number; lng: number }) => {
+  const requestId = ++geocodeRequestRef.current;
   setMarkerPos(coords);
-  const address = await fetchAddressFromCoords(coords.lat, coords.lng);
-  if (address && address !== 'خطا در دریافت آدرس') {
-    setSelectedAddress(address); // فقط اینجا تنظیم می‌شود
-    // incidentAddress را تغییر نمی‌دهیم تا کاربر دستی بنویسد
-  } else {
-    setSelectedAddress('آدرس نامشخص');
-  }
-};
-
-// ====== تابع دریافت موقعیت فعلی کاربر ======
-const handleGetCurrentLocation = () => {
-  if (!navigator.geolocation) {
-    alert('مرورگر شما از موقعیت‌یابی پشتیبانی نمی‌کند.');
+  setIncidentCity('');
+  setSelectedAddress('');
+  setIsAddressResolving(true);
+  if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+  geocodeAbortRef.current?.abort();
+  const cacheKey = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`;
+  const cached = geocodeCacheRef.current.get(cacheKey);
+  if (cached) {
+    setSelectedAddress(cached.address);
+    setIncidentCity(cached.city);
+    setIsAddressResolving(false);
     return;
   }
-  
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const coords = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
-      setMarkerPos(coords);
-      fetchAddressFromCoords(coords.lat, coords.lng).then(address => {
-        if (address && address !== 'خطا در دریافت آدرس') {
-          setSelectedAddress(address); // فقط اینجا تنظیم شود
-        }
-      });
-    },
-    (error) => {
-      console.error('Error getting location:', error);
-      alert('خطا در دریافت موقعیت. لطفاً دسترسی موقعیت را به مرورگر بدهید.');
-    },
-    { enableHighAccuracy: true }
-  );
+  geocodeTimerRef.current = setTimeout(async () => {
+    const controller = new AbortController();
+    geocodeAbortRef.current = controller;
+    const location = await fetchAddressFromCoords(coords.lat, coords.lng, controller.signal);
+    if (requestId !== geocodeRequestRef.current) return;
+    setIsAddressResolving(false);
+    if (location) {
+      if (location.providerAvailable) geocodeCacheRef.current.set(cacheKey, location);
+      setSelectedAddress(location.address);
+      setIncidentCity(location.city);
+    } else {
+      setSelectedAddress('آدرس دقیق موقتاً در دسترس نیست، موقعیت روی نقشه ذخیره شد.');
+    }
+  }, 350);
 };
+
+  useEffect(() => {
+    return () => {
+      if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+      geocodeAbortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -270,25 +360,73 @@ const handleGetCurrentLocation = () => {
   }, []);
 
   useEffect(() => {
+    fetch('/api/uploads/sign')
+      .then(response => response.ok ? response.json() : null)
+      .then(config => {
+        if (Number.isFinite(config?.maxSize) && config.maxSize > 0) setVolDocumentMaxSize(config.maxSize);
+        if (Number.isFinite(config?.maxSizeMb) && config.maxSizeMb > 0) setVolDocumentMaxSizeMb(config.maxSizeMb);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (!finePointer.matches || reducedMotion.matches) return;
+
+    let frame = 0;
+    const handlePointerMove = (event: PointerEvent) => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--cursor-x', `${event.clientX}px`);
+        document.documentElement.style.setProperty('--cursor-y', `${event.clientY}px`);
+      });
+    };
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
     if (chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, isChatLoading]);
 
-  useEffect(() => {
+useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedAdminAuth = localStorage.getItem('hamyar_admin_auth') === 'true';
-      const savedHamyarAuth = localStorage.getItem('hamyar_hamyar_auth') === 'true';
       const savedView = localStorage.getItem('hamyar_current_view');
       const savedTheme = localStorage.getItem('hamyar_theme');
-      
-      if (savedAdminAuth) setIsAdminLoggedIn(true);
-      if (savedHamyarAuth) setIsHamyarLoggedIn(true);
+
+      fetch('/api/auth/session')
+        .then(async response => response.ok ? response.json() : { user: null })
+        .then(({ user }) => {
+          if (user?.role === 'senior_admin') {
+            setIsAdminLoggedIn(true);
+            setIsHamyarLoggedIn(false);
+            refreshVolunteers().catch(err => console.error('Error loading volunteers:', err));
+          } else if (user?.role === 'approved_volunteer' && user.volunteer) {
+            setIsHamyarLoggedIn(true);
+            setIsAdminLoggedIn(false);
+            setLoggedInHamyar(user.volunteer);
+            localStorage.setItem('hamyar_logged_in_data', JSON.stringify(user.volunteer));
+          } else {
+            setIsAdminLoggedIn(false);
+            setIsHamyarLoggedIn(false);
+            setLoggedInHamyar(null);
+          }
+          refreshIncidents().catch(err => console.error('Error loading incidents:', err));
+        })
+        .catch(err => console.error('Error restoring session:', err));
+
       if (savedView) {
         setCurrentView(savedView as any);
       } else {
         setCurrentView('home');
       }
+      
       if (savedTheme !== null) setDarkMode(savedTheme === 'dark');
 
       if (analyticsFired.current) return;
@@ -296,6 +434,8 @@ const handleGetCurrentLocation = () => {
 
       const userIsMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
       const isNewUnique = !localStorage.getItem('real_unique_user');
+
+      // ... بقیه کدهای مربوط به آمار سایت (fetch analytics) ...
 
       fetch('/api/analytics')
         .then(res => res.json())
@@ -325,20 +465,8 @@ const handleGetCurrentLocation = () => {
   }, []);
 
   useEffect(() => {
-    fetch('/api/volunteers')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch volunteers');
-        return res.json();
-      })
-      .then(data => setVolunteers(data))
-      .catch(err => console.error('Error loading volunteers:', err));
-  }, []);
-
-  useEffect(() => {
-    fetch('/api/incidents')
-      .then(res => res.json())
-      .then(data => setIncidents(data))
-      .catch(err => console.error('Error loading incidents:', err));
+    refreshIncidents().catch(err => console.error('Error loading incidents:', err));
+    refreshHomepageStatistics();
   }, []);
 
   const showToast = (message: string) => {
@@ -375,7 +503,7 @@ const handleGetCurrentLocation = () => {
       const response = await fetch('/api/otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', phone: phone.trim(), idempotencyKey: generatedKey, provider })
+        body: JSON.stringify({ action: 'send', phone: phone.trim(), idempotencyKey: generatedKey, provider, purpose: 'incident_report' })
       });
       if (response.ok) {
         const data = await response.json();
@@ -420,7 +548,7 @@ const handleGetCurrentLocation = () => {
       const response = await fetch('/api/otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', phone: phone.trim(), idempotencyKey: generatedKey, provider })
+        body: JSON.stringify({ action: 'send', phone: phone.trim(), idempotencyKey: generatedKey, provider, purpose: 'volunteer_application' })
       });
       if (response.ok) {
         const data = await response.json();
@@ -471,7 +599,7 @@ const handleGetCurrentLocation = () => {
       const response = await fetch('/api/otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send', phone: phone, idempotencyKey: generatedKey, provider: authMethod === 'otp' ? 'bale' : 'sms' })
+        body: JSON.stringify({ action: 'send', phone: phone, idempotencyKey: generatedKey, provider: authMethod === 'otp' ? 'bale' : 'sms', purpose: 'login' })
       });
       if (response.ok) {
         const data = await response.json();
@@ -486,36 +614,42 @@ const handleGetCurrentLocation = () => {
     }
   };
 
-  const handleAdminAuth = async (e: React.FormEvent) => {
+const handleAdminAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     const ident = authIdentifier.trim();
 
     if (authMethod === 'password') {
       const pass = authPassword.trim();
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: ident, password: pass })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          alert(`❌ ${result.error || 'اطلاعات ورود نامعتبر است.'}`);
+          return;
+        }
 
-      if ((ident === adminProfile.phone || ident === adminProfile.email) && pass === "0250122987") {
-        setIsAdminLoggedIn(true);
-        setIsHamyarLoggedIn(false);
+        if (result.user.role === 'senior_admin') {
+          setIsAdminLoggedIn(true);
+          setIsHamyarLoggedIn(false);
+          setLoggedInHamyar(null);
+          await refreshVolunteers();
+        } else {
+          setIsHamyarLoggedIn(true);
+          setIsAdminLoggedIn(false);
+          setLoggedInHamyar(result.user.volunteer);
+          localStorage.setItem('hamyar_logged_in_data', JSON.stringify(result.user.volunteer));
+        }
+        await refreshIncidents();
         setIsAuthMode(false);
-        localStorage.setItem('hamyar_admin_auth', 'true');
         navigateToView('admin');
         setAuthIdentifier(''); setAuthPassword('');
-        return;
+      } catch {
+        alert('❌ خطای ارتباط با سرور احراز هویت.');
       }
-
-      const matchedVol = volunteers.find(v => (v.phone === ident || v.nationalId === ident) && v.status === 'تایید شده');
-      if (matchedVol && matchedVol.fixedPassword === pass) {
-        setIsHamyarLoggedIn(true);
-        setLoggedInHamyar(matchedVol);
-        setIsAdminLoggedIn(false);
-        setIsAuthMode(false);
-        localStorage.setItem('hamyar_hamyar_auth', 'true');
-        navigateToView('admin'); 
-        setAuthIdentifier(''); setAuthPassword('');
-        return;
-      }
-
-      alert("❌ اطلاعات ورود نامعتبر است یا هنوز تایید صلاحیت نشده‌اید.");
     } else {
       if (!authOtpSent) { alert("❌ ابتدا باید درخواست ارسال کد تایید را ثبت کنید."); return; }
       
@@ -524,11 +658,26 @@ const handleGetCurrentLocation = () => {
         const response = await fetch('/api/otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'verify', verification_id: authVerificationId, code: authOtpCode })
+          body: JSON.stringify({ action: 'verify', verification_id: authVerificationId, code: authOtpCode, phone: ident, purpose: 'login' })
         });
         const result = await response.json();
         if (response.ok && (result.verified === true || result.status === 'success' || result.data?.verified === true)) {
           verified = true;
+          if (result.user?.role === 'senior_admin') {
+            setIsAdminLoggedIn(true);
+            setIsHamyarLoggedIn(false);
+            setLoggedInHamyar(null);
+            await refreshVolunteers();
+          } else if (result.user?.role === 'approved_volunteer' && result.user.volunteer) {
+            setIsHamyarLoggedIn(true);
+            setLoggedInHamyar(result.user.volunteer);
+            setIsAdminLoggedIn(false);
+            localStorage.setItem('hamyar_logged_in_data', JSON.stringify(result.user.volunteer));
+          }
+          await refreshIncidents();
+        } else if (result.error) {
+          alert(`❌ ${result.error}`);
+          return;
         }
       } catch (err) {
         alert("❌ خطا در تایید کد ورود.");
@@ -536,31 +685,10 @@ const handleGetCurrentLocation = () => {
       }
 
       if (verified) {
-        if (ident === adminProfile.phone) {
-          setIsAdminLoggedIn(true);
-          setIsHamyarLoggedIn(false);
-          setIsAuthMode(false);
-          localStorage.setItem('hamyar_admin_auth', 'true');
-          navigateToView('admin');
-          setAuthIdentifier(''); setAuthOtpCode(''); setAuthOtpSent(false);
-          alert("✅ ورود پیامکی با موفقیت انجام شد.");
-          return;
-        }
-
-        const matchedVol = volunteers.find(v => v.phone === ident && v.status === 'تایید شده');
-        if (matchedVol) {
-          setIsHamyarLoggedIn(true);
-          setLoggedInHamyar(matchedVol);
-          setIsAdminLoggedIn(false);
-          setIsAuthMode(false);
-          localStorage.setItem('hamyar_hamyar_auth', 'true');
-          navigateToView('admin');
-          setAuthIdentifier(''); setAuthOtpCode(''); setAuthOtpSent(false);
-          alert(`✅ همیار گرامی ${matchedVol.fullName}، هویت پیامکی شما احراز و به سامانه متصل شدید.`);
-          return;
-        } else {
-          alert("❌ درگاه تطبیق: شماره همراه شما تایید شده است، اما هنوز پرونده شما در ستاد تایید صلاحیت نگردیده است.");
-        }
+        setIsAuthMode(false);
+        navigateToView('admin');
+        setAuthIdentifier(''); setAuthOtpCode(''); setAuthOtpSent(false);
+        alert('✅ ورود پیامکی با موفقیت انجام شد.');
       } else {
         alert("❌ کد تایید هویت نامعتبر یا منقضی شده است.");
       }
@@ -569,6 +697,7 @@ const handleGetCurrentLocation = () => {
 
   const handleIncidentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isIncidentSubmitting) return;
     
     if (markerPos.lat === TEHRAN_FALLBACK.lat && markerPos.lng === TEHRAN_FALLBACK.lng) {
       alert("❌ خطای موقعیت‌یابی: شما لوکیشن حادثه را تغییر نداده‌اید! لطفاً ابتدا موقعیت دقیق بحران را روی نقشه نشان علامت‌گذاری کنید.");
@@ -600,22 +729,43 @@ const handleGetCurrentLocation = () => {
       city: incidentCity                // ← اضافه کنید
     };
 
-    setIncidents(prev => [newIncident, ...prev]);
-    alert(isAdminLoggedIn ? "🚨 گزارش با تایید آنی ثبت گردید." : "🚨 گزارش واقعه با موفقیت ثبت و به صف راستی‌آزمایی منتقل شد.");
-    
-    setIncidentDesc(''); setIncidentAddress(''); setReporterName(''); setReporterPhone(''); setSeverityValue(20); setIsReportPhoneVerified(false);
-    setMarkerPos(TEHRAN_FALLBACK);
-    if(isAdminLoggedIn) navigateToView('admin');
+    setIsIncidentSubmitting(true);
+    try {
+      const response = await fetch('/api/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newIncident)
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        alert(`❌ ${result.error || 'ثبت گزارش ناموفق بود.'}`);
+        return;
+      }
 
-    await fetch('/api/incidents', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newIncident)
-    }).catch(err => console.error("Failed to save incident physically:", err));
+      newIncident.city = result.city || newIncident.city;
+      setIncidents(prev => [newIncident, ...prev]);
+      refreshHomepageStatistics();
+      alert(result.warning
+        ? `✅ گزارش ثبت شد. ${result.warning}`
+        : (isAdminLoggedIn ? '🚨 گزارش با تایید آنی ثبت گردید.' : '🚨 گزارش واقعه ثبت شد و پیامک تأیید ارسال گردید.'));
+      setIncidentDesc(''); setIncidentAddress(''); setReporterName(''); setReporterPhone(''); setSeverityValue(20); setIsReportPhoneVerified(false);
+      setIncidentCity('');
+      setMarkerPos(TEHRAN_FALLBACK);
+      if(isAdminLoggedIn) navigateToView('admin');
+    } catch {
+      alert('❌ خطای شبکه؛ گزارش ثبت نشد.');
+    } finally {
+      setIsIncidentSubmitting(false);
+    }
   };
 
-  const handleVolunteerSubmit = (e: React.FormEvent) => {
+  const handleVolunteerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setVolSubmitErrorMsg('');
+    if (volDocumentUploading) {
+      alert('لطفاً تا پایان آپلود مدرک صبر کنید.');
+      return;
+    }
     if (!isVolPhoneVerified) { 
       alert('❌ خطا: جهت ثبت درخواست ابتدا باید شماره همراه خود را احراز هویت کنید.');
       return; 
@@ -624,6 +774,7 @@ const handleGetCurrentLocation = () => {
     if (!checkMelliCode(volNationalId)) { alert("❌ کد ملی معتبر نیست!"); return; }
     if (volGender === '') { alert("❌ لطفا جنسیت خود را انتخاب کنید."); return; }
     if (!volBirthDay || !volBirthMonth || !volBirthYear) { alert("❌ لطفا تاریخ تولد خود را به صورت کامل (روز، ماه، سال) وارد کنید."); return; }
+    if (!volCity) { alert('❌ لطفاً شهر محل سکونت را از فهرست انتخاب کنید.'); return; }
     if (selectedSkills.length === 0) { alert("❌ لطفا حداقل یک تخصص انتخاب کنید."); return; }
 
     const finalSkills = selectedSkills.filter(s => s !== 'other_skill');
@@ -647,42 +798,136 @@ const handleGetCurrentLocation = () => {
       city: volCity.trim()  // ← اضافه کنید
     };
 
-    setVolunteers(prev => [newVolunteer, ...prev]);
-    setVolSubmitErrorMsg('');
-    alert("📝 فرم درخواست با موفقیت ثبت موقت شد.");
-    
-    setVolName(''); setVolPhone(''); setVolNationalId(''); setVolGender(''); 
-    setVolBirthDay(''); setVolBirthMonth(''); setVolBirthYear('');
-    setSelectedSkills([]); setCustomSkill(''); setVolJob(''); setVolAddress(''); setIsVolPhoneVerified(false);
-
-    fetch('/api/volunteers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newVolunteer)
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to save volunteer');
-        return res.json();
-      })
-      .then(data => {
-        console.log('Volunteer saved to database:', data);
-      })
-      .catch(err => {
-        console.error('Error saving volunteer:', err);
+    try {
+      const response = await fetch('/api/volunteers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newVolunteer)
       });
+      const result = await response.json();
+      if (!response.ok) {
+        setVolSubmitErrorMsg(result.error || 'ثبت درخواست داوطلبی ناموفق بود.');
+        alert(`❌ ${result.error || 'ثبت درخواست داوطلبی ناموفق بود.'}`);
+        return;
+      }
+      setVolunteers(prev => [{ ...newVolunteer, id: result.id }, ...prev]);
+      refreshHomepageStatistics();
+      setVolSubmitErrorMsg('');
+      alert('📝 درخواست داوطلبی با موفقیت ثبت شد.');
+      setVolName(''); setVolPhone(''); setVolNationalId(''); setVolGender('');
+      setVolBirthDay(''); setVolBirthMonth(''); setVolBirthYear('');
+      setSelectedSkills([]); setCustomSkill(''); setVolJob(''); setVolAddress(''); setVolCity(''); setIsVolPhoneVerified(false);
+      setVolDocument(null); setVolDocumentError('');
+    } catch {
+      alert('❌ خطای شبکه؛ درخواست ثبت نشد.');
+    }
   };
 
-  const handleChangeHamyarPassword = () => {
-    const passRegex = /^[a-zA-Z]{6}\d{3}$/;
-    if (!passRegex.test(newPasswordInput.trim())) { 
-      alert("❌ گذرواژه جدید باید دقیقاً شامل ۶ حرف انگلیسی و به دنبال آن ۳ رقم باشد."); 
-      return; 
+  const handleVolunteerDocumentSelect = async (file: File | undefined) => {
+    if (!file || volDocumentUploading) return;
+    setVolDocumentError('');
+    const extension = file.name.toLowerCase().split('.').pop();
+    if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type) || !['pdf', 'jpg', 'jpeg', 'png'].includes(extension || '')) {
+      setVolDocumentError('فقط فایل‌های PDF، JPG، JPEG و PNG مجاز هستند.');
+      return;
     }
-    if (loggedInHamyar) {
-      setVolunteers(prev => prev.map(v => v.id === loggedInHamyar.id ? {...v, fixedPassword: newPasswordInput.trim()} : v));
-      setLoggedInHamyar(prev => prev ? {...prev, fixedPassword: newPasswordInput.trim()} : null);
-      alert("✅ گذرواژه با موفقیت تغییر یافت.");
-      setNewPasswordInput('');
+    if (file.size <= 0 || file.size > volDocumentMaxSize) {
+      setVolDocumentError(`حجم فایل باید بیشتر از صفر و حداکثر ${volDocumentMaxSizeMb} مگابایت باشد.`);
+      return;
+    }
+    if (!isVolPhoneVerified) {
+      setVolDocumentError('ابتدا شماره همراه خود را تأیید کنید.');
+      return;
+    }
+
+    setVolDocumentUploading(true);
+    try {
+      const signResponse = await fetch('/api/uploads/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: file.name, contentType: file.type, size: file.size })
+      });
+      const signed = await signResponse.json();
+      if (!signResponse.ok) throw new Error(signed.error || 'آماده‌سازی آپلود فایل ممکن نشد.');
+      const uploadId = Number(signed.uploadId);
+      const uploadResponse = await fetch(signed.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+      if (!uploadResponse.ok) throw new Error('ارسال فایل به فضای ذخیره‌سازی ناموفق بود.');
+      const completeResponse = await fetch('/api/uploads/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadId })
+      });
+      const completed = await completeResponse.json();
+      if (!completeResponse.ok) throw new Error(completed.error || 'تأیید فایل آپلودشده ممکن نشد.');
+      setVolDocument({ id: Number(completed.documentId), originalName: file.name, contentType: file.type, size: file.size });
+    } catch (error) {
+      setVolDocumentError(error instanceof Error ? error.message : 'آپلود فایل ممکن نشد.');
+    } finally {
+      setVolDocumentUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleViewVolunteerDocument = async (documentId: number) => {
+    const preview = window.open('', '_blank', 'noopener,noreferrer');
+    try {
+      const response = await fetch(`/api/uploads/${documentId}/download`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'مشاهده فایل ممکن نشد.');
+      if (preview) preview.location.href = result.url;
+      else window.location.href = result.url;
+    } catch (error) {
+      preview?.close();
+      alert(error instanceof Error ? error.message : 'مشاهده فایل ممکن نشد.');
+    }
+  };
+
+  const handleDeleteVolunteerDocument = async (documentId: number) => {
+    if (!confirm('آیا از حذف این مدرک مطمئن هستید؟')) return;
+    const response = await fetch(`/api/uploads/${documentId}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) {
+      alert(result.error || 'حذف فایل ممکن نشد.');
+      return;
+    }
+    setVolunteers(prev => prev.map(volunteer => ({
+      ...volunteer,
+      documents: volunteer.documents?.filter(document => document.id !== documentId)
+    })));
+    setSelectedVolForPage(prev => prev ? {
+      ...prev,
+      documents: prev.documents?.filter(document => document.id !== documentId)
+    } : null);
+  };
+
+  const handleChangeHamyarPassword = async () => {
+    const next = newPasswordInput;
+    if (next.length < 6 || (next.match(/[A-Za-z]/g)?.length || 0) < 2 || (next.match(/[0-9]/g)?.length || 0) < 2) {
+      alert('❌ گذرواژه جدید باید حداقل ۶ کاراکتر و شامل دست‌کم ۲ حرف و ۲ رقم انگلیسی باشد.');
+      return;
+    }
+    if (next !== confirmPasswordInput) { alert('❌ تکرار گذرواژه جدید مطابقت ندارد.'); return; }
+    if (next === currentPasswordInput) { alert('❌ گذرواژه جدید نباید با گذرواژه فعلی یکسان باشد.'); return; }
+
+    setPasswordChangeLoading(true);
+    try {
+      const response = await fetch('/api/auth/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPasswordInput, newPassword: next, confirmation: confirmPasswordInput })
+      });
+      const result = await response.json();
+      if (!response.ok) { alert(`❌ ${result.error || 'تغییر گذرواژه ناموفق بود.'}`); return; }
+      setCurrentPasswordInput(''); setNewPasswordInput(''); setConfirmPasswordInput('');
+      alert('✅ گذرواژه با موفقیت تغییر یافت.');
+    } catch {
+      alert('❌ خطای شبکه در تغییر گذرواژه.');
+    } finally {
+      setPasswordChangeLoading(false);
     }
   };
 
@@ -743,13 +988,19 @@ const handleGetCurrentLocation = () => {
     }
   };
 
-  const processedIncidents = useMemo(() => {
-    let result = [...incidents];
-    if (filterType !== 'all') { result = result.filter(inc => inc.type === filterType); }
-    if (sortBy === 'critical') { result.sort((a, b) => b.severityValue - a.severityValue); }
-    else { result.sort((a, b) => b.id - a.id); }
-    return result;
-  }, [incidents, filterType, sortBy]);
+const processedIncidents = useMemo(() => {
+  let result = [...incidents];
+  
+  // 🟢 گارد فرانت‌باند: اگر همیار لاگین بود، حوادث "در دست بررسی" را کلاً نبیند
+  if (isHamyarLoggedIn && !isAdminLoggedIn) {
+    result = result.filter(inc => inc.status === 'تایید شده' || inc.status === 'تحت کنترل همیار (اعزام نیرو)');
+  }
+
+  if (filterType !== 'all') { result = result.filter(inc => inc.type === filterType); }
+  if (sortBy === 'critical') { result.sort((a, b) => b.severityValue - a.severityValue); }
+  else { result.sort((a, b) => b.id - a.id); }
+  return result;
+}, [incidents, filterType, sortBy, isHamyarLoggedIn, isAdminLoggedIn]);
 
   const statsMemo = useMemo(() => {
     return {
@@ -776,6 +1027,7 @@ const handleGetCurrentLocation = () => {
 
   return (
     <main dir="rtl" className={`relative w-full h-screen flex flex-col md:flex-row overflow-hidden font-sans select-none antialiased transition-colors duration-300 ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-[#e0f2fe]'}`}>
+      <div aria-hidden="true" className={`cursor-glow ${darkMode ? 'cursor-glow-dark' : 'cursor-glow-light'}`} />
       
       {/* 🎧 ویجت پشتیبانی شناور */}
       {currentView !== 'support-ai' && (
@@ -949,6 +1201,12 @@ const handleGetCurrentLocation = () => {
               </div>
             </div>
 
+            <HomepageCircularStatistics
+              statistics={homepageStatistics}
+              loadingError={homepageStatisticsError}
+              darkMode={darkMode}
+            />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
               <div className={`border rounded-3xl p-5 md:p-6 flex flex-col sm:flex-row items-center gap-4 transition-all duration-300 ${
                 darkMode 
@@ -963,7 +1221,9 @@ const handleGetCurrentLocation = () => {
                   <p className={`text-xs md:text-sm font-semibold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                     تا این لحظه تعداد{' '}
                     <span className={`text-xl md:text-2xl font-black font-mono px-1.5 align-middle text-shadow-sm animate-[pulse_2.5s_infinite] ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                      {volunteers.length.toLocaleString('en-US')}
+                      {homepageStatistics
+                        ? homepageStatistics.registeredVolunteers.toLocaleString('en-US')
+                        : homepageStatisticsError ? 'نامشخص' : '…'}
                     </span>{' '}
                     داوطلب برای کمک به شما عزیزان در سامانه ثبت‌نام کرده‌اند.
                     <button onClick={() => navigateToView('volunteer')} className="inline-block font-black text-emerald-500 hover:text-emerald-400 transition-colors mr-1.5 focus:outline-none focus:underline">( فرم داوطلبی )</button>
@@ -984,7 +1244,9 @@ const handleGetCurrentLocation = () => {
                   <p className={`text-xs md:text-sm font-semibold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                     تاکنون آمار زنده و رسمی{' '}
                     <span className={`text-xl md:text-2xl font-black font-mono px-1.5 align-middle text-shadow-sm animate-[pulse_2.5s_infinite] ${darkMode ? 'text-red-400' : 'text-red-500'}`}>
-                      {incidents.length.toLocaleString('en-US')}
+                      {homepageStatistics
+                        ? homepageStatistics.registeredIncidents.toLocaleString('en-US')
+                        : homepageStatisticsError ? 'نامشخص' : '…'}
                     </span>{' '}
                     حادثه اضطراری و جدی در ساختار شبکه مدیریت ثبت گردیده است.
                     <button onClick={() => navigateToView('report')} className="inline-block font-black text-red-500 hover:text-red-400 transition-colors mr-1.5 focus:outline-none focus:underline">( فرم ثبت حادثه )</button>
@@ -1047,16 +1309,6 @@ const handleGetCurrentLocation = () => {
             darkMode={darkMode} 
             height="100%" 
           />
-          
-          {/* دکمه موقعیت‌یابی خودکار */}
-          <button
-            type="button"
-            onClick={handleGetCurrentLocation}
-            className="absolute bottom-4 right-4 z-[1000] p-3 rounded-full shadow-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:scale-110 transition-all duration-300"
-            title="دریافت موقعیت فعلی"
-          >
-            <Crosshair className="w-5 h-5 text-red-500" />
-          </button>
         </div>
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-xs text-slate-400 animate-pulse">
@@ -1066,12 +1318,12 @@ const handleGetCurrentLocation = () => {
     </div>
 
     {/* 📍 باکس نمایش آدرس مارک‌شده (دقیقاً زیر نقشه و بیرون از آن) */}
-    {selectedAddress && (
+    {(selectedAddress || isAddressResolving) && (
       <div className="w-full px-4 py-2 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-black/5 dark:border-white/5">
         <div className="max-w-4xl mx-auto flex items-center gap-2">
           <span className="text-[10px] font-black text-slate-400">📍 موقعیت انتخاب‌شده:</span>
-          <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate flex-1">
-            {selectedAddress}
+          <p className="text-xs font-bold text-slate-700 dark:text-slate-300 line-clamp-2 flex-1" dir="rtl">
+            {isAddressResolving ? 'در حال دریافت آدرس موقعیت انتخابشده...' : selectedAddress}
           </p>
         </div>
       </div>
@@ -1216,27 +1468,20 @@ const handleGetCurrentLocation = () => {
               />
             </div>
             
-            {/* فیلد شهر - ثبت حادثه */}
+            {/* شهر تشخیص‌داده‌شده از نشانگر نقشه */}
             <div className="space-y-1.5 mt-3">
               <label className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? 'text-slate-300' : 'text-red-600'}`}>
                 <MapPin className={`w-3.5 h-3.5 ${darkMode ? 'text-slate-300' : 'text-red-600'}`} />
-                شهر محل وقوع حادثه
+                شهر تشخیص‌داده‌شده از نقشه
               </label>
-              <div className={`relative rounded-xl border transition-all duration-300 focus-within:ring-2 focus-within:ring-red-500/30 ${
-                darkMode 
-                  ? 'border-slate-700 bg-slate-800/50 focus-within:border-red-500' 
-                  : 'border-slate-200 bg-slate-50/50 focus-within:border-red-400'
+              <div className={`rounded-xl border px-4 py-3 text-sm font-bold ${
+                incidentCity
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                  : darkMode
+                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                    : 'border-amber-300 bg-amber-50 text-amber-700'
               }`}>
-                <input
-                  type="text"
-                  required
-                  value={incidentCity}
-                  onChange={(e) => setIncidentCity(e.target.value)}
-                  placeholder="مثلاً: تهران، مشهد، اصفهان..."
-                  className={`w-full bg-transparent px-4 py-3 text-sm font-bold focus:outline-none placeholder:opacity-40 ${
-                    darkMode ? 'text-white placeholder:text-slate-400' : 'text-slate-900 placeholder:text-slate-400'
-                  }`}
-                />
+                {incidentCity || 'برای تشخیص شهر، نشانگر را روی موقعیت معتبر حادثه قرار دهید.'}
               </div>
             </div>
             <p className="text-[9px] font-black opacity-30">* برای مشاهده آدرس مارک‌شده روی نقشه، به باکس زیر نقشه نگاه کنید</p>
@@ -1486,16 +1731,20 @@ const handleGetCurrentLocation = () => {
           {/* دکمه ارسال */}
           <button
             type="submit"
-            disabled={!isReportPhoneVerified && !isAdminLoggedIn}
+            disabled={isIncidentSubmitting || (!isReportPhoneVerified && !isAdminLoggedIn)}
             className={`w-full relative overflow-hidden text-sm font-black rounded-2xl py-4 transition-all duration-300 flex items-center justify-center gap-2 ${
-              isReportPhoneVerified || isAdminLoggedIn
+              (isReportPhoneVerified || isAdminLoggedIn) && !isIncidentSubmitting
                 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-[1.02] active:scale-95 cursor-pointer'
                 : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
             }`}
           >
             <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
             <ShieldAlert className="w-5 h-5" />
-            {isReportPhoneVerified || isAdminLoggedIn ? 'ارسال فوری گزارش به ستاد فرماندهی' : 'لطفاً ابتدا شماره همراه خود را احراز هویت کنید'}
+            {isIncidentSubmitting
+              ? 'در حال ثبت گزارش…'
+              : isReportPhoneVerified || isAdminLoggedIn
+                ? 'ارسال فوری گزارش به ستاد فرماندهی'
+                : 'لطفاً ابتدا شماره همراه خود را احراز هویت کنید'}
           </button>
 
           {/* پیام وضعیت */}
@@ -1520,11 +1769,11 @@ const handleGetCurrentLocation = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-[11px] font-black mb-1">نام و نام خانوادگی</label>
-                  <input type="text" required value={volName} onChange={(e) => setVolName(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً نام و نام خانوادگی متقاضی را وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                  <input type="text" required value={volName} onChange={(e) => setVolName(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً نام و نام خانوادگی متقاضی را وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={volunteerFieldClass} />
                 </div>
                 <div className="relative">
                   <label className="block text-[11px] font-black mb-1">جنسیت</label>
-                  <button type="button" onClick={() => setOpenGenderDropdown(!openGenderDropdown)} className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none font-bold flex items-center justify-between transition-colors ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}>
+                  <button type="button" onClick={() => setOpenGenderDropdown(!openGenderDropdown)} className={`${volunteerFieldClass} flex items-center justify-between text-right`}>
                     <span>{volGender === '' ? 'انتخاب کنید' : volGender}</span>
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openGenderDropdown ? 'rotate-180' : ''}`} />
                   </button>
@@ -1540,7 +1789,7 @@ const handleGetCurrentLocation = () => {
                 </div>
                 <div>
                   <label className="block text-[11px] font-black mb-1">🪪 کد ملی (۱۰ رقم)</label>
-                  <input type="text" required maxLength={10} minLength={10} value={volNationalId} onChange={(e) => setVolNationalId(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً کد ملی ده رقمی معتبر را برای عضویت بنویسید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} placeholder="" className={`w-full border text-left dir-ltr font-mono rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                  <input type="text" required maxLength={10} minLength={10} value={volNationalId} onChange={(e) => setVolNationalId(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً کد ملی ده رقمی معتبر را برای عضویت بنویسید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} placeholder="" className={`${volunteerFieldClass} text-left dir-ltr font-mono`} />
                 </div>
               </div>
 
@@ -1548,41 +1797,27 @@ const handleGetCurrentLocation = () => {
               <div>
                 <label className="block text-[11px] font-black mb-1">📅 تاریخ تولد (شمسی)</label>
                 <div className="grid grid-cols-3 gap-2">
-                  <select 
-                    required 
-                    value={volBirthDay} 
-                    onChange={(e) => setVolBirthDay(e.target.value)} 
-                    className={`w-full border rounded-xl px-2 py-2 text-xs font-bold focus:outline-none appearance-none cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
-                  >
-                    <option value="">روز</option>
-                    {persianDays.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  
-                  <select 
-                    required 
-                    value={volBirthMonth} 
-                    onChange={(e) => setVolBirthMonth(e.target.value)} 
-                    className={`w-full border rounded-xl px-2 py-2 text-xs font-bold focus:outline-none appearance-none cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
-                  >
-                    <option value="">ماه</option>
-                    {persianMonths.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                  
-                  <select 
-                    required 
-                    value={volBirthYear} 
-                    onChange={(e) => setVolBirthYear(e.target.value)} 
-                    className={`w-full border rounded-xl px-2 py-2 text-xs font-bold focus:outline-none appearance-none cursor-pointer ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
-                  >
-                    <option value="">سال</option>
-                    {persianYears.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                  {([
+                    { key: 'day', label: 'روز', value: volBirthDay, options: persianDays, setValue: setVolBirthDay },
+                    { key: 'month', label: 'ماه', value: volBirthMonth, options: persianMonths, setValue: setVolBirthMonth },
+                    { key: 'year', label: 'سال', value: volBirthYear, options: persianYears, setValue: setVolBirthYear }
+                  ] as const).map(field => (
+                    <div className="relative" key={field.key}>
+                      <button type="button" onClick={() => setOpenBirthDropdown(openBirthDropdown === field.key ? null : field.key)} className={`${volunteerFieldClass} flex cursor-pointer items-center justify-between text-right hover:border-red-400`}>
+                        <span>{field.value || field.label}</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openBirthDropdown === field.key ? 'rotate-180' : ''}`} />
+                      </button>
+                      {openBirthDropdown === field.key && (
+                        <div className={`absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-xl shadow-2xl border z-50 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+                          {field.options.map(option => (
+                            <button key={option} type="button" onClick={() => { field.setValue(String(option)); setOpenBirthDropdown(null); }} className={`w-full px-4 py-2 text-center text-xs font-bold transition-colors ${String(field.value) === String(option) ? 'bg-red-500/10 text-red-500 font-black' : darkMode ? 'hover:bg-slate-700 text-slate-100' : 'hover:bg-slate-50 text-slate-900'}`}>
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -1590,30 +1825,33 @@ const handleGetCurrentLocation = () => {
 
                 <div>
                   <label className="block text-[11px] font-black mb-1">💼 شغل فعلی</label>
-                  <input type="text" required value={volJob} onChange={(e) => setVolJob(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً فرم مربوط به شغل فعلی خود را پر کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                  <input type="text" required value={volJob} onChange={(e) => setVolJob(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً فرم مربوط به شغل فعلی خود را پر کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={volunteerFieldClass} />
                 </div>
                 <div>
                   <label className="block text-[11px] font-black mb-1">🏠 آدرس دقیق</label>
-                  <input type="text" required value={volAddress} onChange={(e) => setVolAddress(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً آدرس دقیق محل سکونت خود را پر کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                  <input type="text" required value={volAddress} onChange={(e) => setVolAddress(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً آدرس دقیق محل سکونت خود را پر کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={volunteerFieldClass} />
                 </div>
                 {/* فیلد شهر - ثبت داوطلب */}
-<div>
+<div className="relative">
   <label className="block text-[11px] font-black mb-1">🏙️ شهر محل سکونت</label>
-  <input
-    type="text"
-    required
-    value={volCity}
-    onChange={(e) => setVolCity(e.target.value)}
-    placeholder="مثلاً: تهران، مشهد، اصفهان..."
-    className={`w-full border rounded-xl px-4 py-2 text-xs focus:outline-none font-bold ${
-      darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-    }`}
-  />
+  <button type="button" onClick={() => setOpenCityDropdown(!openCityDropdown)} className={`${volunteerFieldClass} flex cursor-pointer items-center justify-between text-right hover:border-red-400`}>
+    <span>{volCity || 'انتخاب شهر'}</span>
+    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openCityDropdown ? 'rotate-180' : ''}`} />
+  </button>
+  {openCityDropdown && (
+    <div className={`absolute left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-xl shadow-2xl border z-50 ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+      {IRANIAN_CITIES.map(city => (
+        <button key={city} type="button" onClick={() => { setVolCity(city); setOpenCityDropdown(false); }} className={`w-full text-right px-4 py-2 text-xs font-bold transition-colors ${volCity === city ? 'bg-red-500/10 text-red-500 font-black' : darkMode ? 'hover:bg-slate-700 text-slate-100' : 'hover:bg-slate-50 text-slate-900'}`}>
+          {city}
+        </button>
+      ))}
+    </div>
+  )}
 </div>
                 <div>
                   <label className="block text-[11px] font-black mb-1">📱 شماره همراه</label>
                   <div className="flex flex-col gap-1.5">
-                    <input type="tel" required placeholder="09xxxxxxxxx" maxLength={11} value={volPhone} onChange={(e) => setVolPhone(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً شماره همراه متقاضی را برای ارسال کد وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`w-full border text-left dir-ltr font-mono rounded-xl px-3 py-2 text-xs focus:outline-none font-bold ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`} />
+                    <input type="tel" required placeholder="09xxxxxxxxx" maxLength={11} value={volPhone} onChange={(e) => setVolPhone(e.target.value)} onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('لطفاً شماره همراه متقاضی را برای ارسال کد وارد کنید.')} onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')} className={`${volunteerFieldClass} text-left dir-ltr font-mono`} />
                     <div className="flex gap-1.5">
                       <button type="button" onClick={() => handleSendVolOTP(volPhone, 'bale')} disabled={volCooldown} className={`flex-1 text-xs font-black py-2 rounded-xl transition shadow-sm ${volCooldown ? 'bg-gray-500 text-gray-300 cursor-not-allowed' : 'bg-red-500 text-white hover:bg-red-600'}`}>ارسال کد تایید به بله</button>
                       
@@ -1665,14 +1903,27 @@ const handleGetCurrentLocation = () => {
 
               <div className="border-t pt-4 mt-4 border-black/10">
                 <label className="block text-[11px] font-black mb-2 text-slate-400">📄 در صورت داشتن گواهینامه های مربوطه به تخصص خود لطفا آن را در سامانه ذکر کرده و آن را آپلود کنید:</label>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-slate-100 border border-dashed border-slate-400 p-4 rounded-xl w-full text-slate-500 font-bold text-xs justify-center hover:bg-slate-200 transition">
-                  <Upload className="w-4 h-4 text-slate-500" /> انتخاب و آپلود فایل مدرک تخصص
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={volDocumentUploading || Boolean(volDocument)} className="flex items-center gap-2 bg-slate-100 border border-dashed border-slate-400 p-4 rounded-xl w-full text-slate-500 font-bold text-xs justify-center hover:bg-slate-200 transition disabled:cursor-not-allowed disabled:opacity-60">
+                  <Upload className={`w-4 h-4 text-slate-500 ${volDocumentUploading ? 'animate-pulse' : ''}`} />
+                  {volDocumentUploading ? 'در حال آپلود و تأیید فایل...' : volDocument ? 'مدرک تخصصی آپلود شده است' : 'انتخاب و آپلود فایل مدرک تخصص'}
                 </button>
-                <input type="file" ref={fileInputRef} className="hidden" />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  onChange={(event) => handleVolunteerDocumentSelect(event.target.files?.[0])}
+                  className="hidden"
+                />
+                {volDocument && (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-500">
+                    <span className="truncate">مدرک آپلود شد: {volDocument.originalName} ({(volDocument.size / 1024 / 1024).toFixed(2)} MB)</span>
+                  </div>
+                )}
+                {volDocumentError && <p className="mt-2 text-[11px] font-bold text-red-500">{volDocumentError}</p>}
               </div>
 
               <div className="space-y-2">
-                <button type="submit" className={`w-full text-xs font-black rounded-xl py-3 transition shadow-md ${isVolPhoneVerified ? 'bg-gradient-to-r from-red-600 to-red-600 text-white shadow-md' : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'}`}><UserPlus className="w-4 h-4 inline-block ml-1" /> <span>ثبت نهایی درخواست عضویت نیروها</span></button>
+                <button type="submit" disabled={volDocumentUploading} className={`w-full text-xs font-black rounded-xl py-3 transition shadow-md ${isVolPhoneVerified && !volDocumentUploading ? 'bg-gradient-to-r from-red-600 to-red-600 text-white shadow-md' : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'}`}><UserPlus className="w-4 h-4 inline-block ml-1" /> <span>ثبت نهایی درخواست عضویت نیروها</span></button>
                 {volSubmitErrorMsg && (
                   <p className="text-red-500 font-bold text-center text-[11px] animate-pulse bg-red-500/5 p-2 rounded-xl border border-red-500/20">{volSubmitErrorMsg}</p>
                 )}
@@ -1761,6 +2012,26 @@ const handleGetCurrentLocation = () => {
                       )}
                     </div>
                   </div>
+                  <div className="md:col-span-2 border-t pt-3 border-black/10">
+                    <strong>مدارک تخصصی:</strong>
+                    {selectedVolForPage.documents?.length ? (
+                      <div className="mt-2 space-y-2">
+                        {selectedVolForPage.documents.map(document => (
+                          <div key={document.id} className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+                            <span className="min-w-0 truncate text-[11px] font-bold">
+                              {document.originalName} ({(document.size / 1024 / 1024).toFixed(2)} MB)
+                            </span>
+                            <div className="flex shrink-0 gap-1">
+                              <button type="button" onClick={() => handleViewVolunteerDocument(document.id)} className="rounded-lg bg-blue-600 px-2 py-1 text-[10px] font-black text-white">مشاهده</button>
+                              <button type="button" onClick={() => handleDeleteVolunteerDocument(document.id)} className="rounded-lg bg-red-600 px-2 py-1 text-[10px] font-black text-white">حذف</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[10px] text-slate-400">مدرکی برای این پرونده ثبت نشده است.</p>
+                    )}
+                  </div>
                   <div className="md:col-span-2 flex justify-between items-center border-t pt-4 border-black/10 gap-2">
                     <div className="flex gap-2 flex-wrap">
                       <button 
@@ -1812,14 +2083,15 @@ const handleGetCurrentLocation = () => {
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ status: 'تایید شده' })
                             });
+                            const result = await res.json();
                             if (res.ok) {
-                              setVolunteers(prev => prev.map(v => v.id === selectedVolForPage.id ? {...v, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : v));
+                              setVolunteers(prev => prev.map(v => v.id === selectedVolForPage.id ? {...v, status: 'تایید شده', rank: 'امدادگر رسمی'} : v));
                               const updated = await fetch('/api/volunteers').then(r => r.json());
                               setVolunteers(updated);
-                              setSelectedVolForPage(prev => prev ? {...prev, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : null);
-                              alert('✅ پرونده همیار داوطلب تایید صلاحیت گردید و دسترسی سیستم صادر شد.');
+                              setSelectedVolForPage(prev => prev ? {...prev, status: 'تایید شده', rank: 'امدادگر رسمی'} : null);
+                              alert(result.warning ? `⚠️ ${result.warning}` : '✅ پرونده تأیید و رمز موقت از طریق پیامک ارسال شد.');
                             } else {
-                              alert('❌ خطا در تایید صلاحیت');
+                              alert(`❌ ${result.error || 'خطا در تایید صلاحیت'}`);
                             }
                           } catch (e) {
                             alert('❌ خطای شبکه');
@@ -1849,19 +2121,16 @@ const handleGetCurrentLocation = () => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-800/80 pt-3">
-                  <div className={`border p-3 rounded-xl flex items-center justify-between ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block font-bold">🔑 رمز ورود شما:</span>
-                      <span className="text-xs font-mono font-black text-red-400 tracking-wider">{loggedInHamyar.fixedPassword || 'بدون رمز'}</span>
-                    </div>
-                    <Key className="w-4 h-4 text-red-500/40" />
+                <div className="border-t border-slate-800/80 pt-3 space-y-3">
+                  <div className="flex items-center gap-2"><Key className="w-4 h-4 text-red-500" /><h3 className="text-xs font-black">تغییر گذرواژه</h3></div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <input type="password" autoComplete="current-password" placeholder="گذرواژه فعلی" value={currentPasswordInput} onChange={(e) => setCurrentPasswordInput(e.target.value)} className={volunteerFieldClass} />
+                    <input type="password" autoComplete="new-password" placeholder="گذرواژه جدید" value={newPasswordInput} onChange={(e) => setNewPasswordInput(e.target.value)} className={volunteerFieldClass} />
+                    <input type="password" autoComplete="new-password" placeholder="تکرار گذرواژه جدید" value={confirmPasswordInput} onChange={(e) => setConfirmPasswordInput(e.target.value)} className={volunteerFieldClass} />
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex gap-2">
-                      <input type="text" placeholder="گذرواژه جدید استاندارد" value={newPasswordInput} onChange={(e) => setNewPasswordInput(e.target.value)} className={`border rounded-xl px-3 py-1.5 text-xs font-bold flex-1 focus:outline-none ${darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-red-200'}`} />
-                      <button type="button" onClick={handleChangeHamyarPassword} className="bg-red-600 text-white text-xs font-black px-3 rounded-xl transition shadow">بروزرسانی</button>
-                    </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <p className="text-[10px] text-slate-500">حداقل ۶ کاراکتر، شامل حداقل ۲ حرف و ۲ رقم انگلیسی</p>
+                    <button type="button" disabled={passwordChangeLoading} onClick={handleChangeHamyarPassword} className="bg-red-600 disabled:opacity-50 text-white text-xs font-black px-5 py-2.5 rounded-xl transition shadow">{passwordChangeLoading ? 'در حال بروزرسانی...' : 'بروزرسانی گذرواژه'}</button>
                   </div>
                 </div>
               </div>
@@ -1876,9 +2145,12 @@ const handleGetCurrentLocation = () => {
                   </div>
                   
                   <button 
-                    onClick={() => { 
+                    onClick={async () => {
+                      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null);
                       setIsAdminLoggedIn(false); setIsHamyarLoggedIn(false); setLoggedInHamyar(null); 
                       localStorage.removeItem('hamyar_admin_auth'); localStorage.removeItem('hamyar_hamyar_auth');
+                      localStorage.removeItem('hamyar_logged_in_data');
+                      await refreshIncidents().catch(() => null);
                       setAuthIdentifier(''); setAuthPassword(''); navigateToView('report'); 
                     }} 
                     className={`font-black px-6 py-2.5 rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2 order-2 ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-gradient-to-r from-red-600 to-red-500 text-white'}`}
@@ -1955,92 +2227,157 @@ const handleGetCurrentLocation = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                      {processedIncidents.map((inc) => (
-                        <div key={inc.id} className={`border rounded-2xl p-4 flex flex-col justify-between space-y-3 relative shadow-sm ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-red-200 text-slate-900 shadow-sm'}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              {getCrisisIconComponent(inc.type, severityColor)}
-                              <div>
-                                <h4 className="text-xs font-black">{inc.type}</h4>
-                                <p className="text-[9px] text-slate-500 font-mono mt-0.5">گزارش‌دهنده: {inc.reporterName}</p>
-                              </div>
-                            </div>
-                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white font-mono shrink-0" style={{ backgroundColor: severityColor }}>{inc.severityValue}%</span>
-                          </div>
-                          <p className="text-xs leading-relaxed min-h-[35px] font-bold">{inc.description}</p>
-                          
-                          <div className="flex flex-col gap-1 text-[10px] font-bold">
-                            <div className="text-slate-400">📍 آدرس دستی کاربر: {inc.manualAddress || 'ثبت نشده'}</div>
-                            <div className="text-slate-400">🗺️ موقعیت نقشه: lat: {inc.mapLat || inc.lat}, lng: {inc.mapLng || inc.lng}</div>
-                            <div className="text-red-600 font-sans">وضعیت: {inc.status}</div>
-                            <div className="text-slate-400">🏙️ شهر: {inc.city || 'ثبت نشده'}</div>
-                            {inc.assignedHamyars && inc.assignedHamyars.length > 0 && (
-                              <div className="text-red-700 font-sans">💂‍♂️ اعزام شده: ({inc.assignedHamyars.join(' ، ')})</div>
-                            )}
-                          </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        {isHamyarLoggedIn && !incidentsLoading && !incidentsLoadError && processedIncidents.length === 0 && (
+          <div className={`md:col-span-2 rounded-2xl border px-4 py-6 text-center text-xs font-bold ${
+            darkMode
+              ? 'border-slate-700 bg-slate-800/60 text-slate-300'
+              : 'border-slate-200 bg-white text-slate-600'
+          }`}>
+            در حال حاضر حادثه تأییدشده‌ای در شهر شما ثبت نشده است.
+          </div>
+        )}
+{/* 🟢 جایگزین کامل حلقه رندر کارت‌های حوادث شما: */}
+{/* 🟢 جایگزین نهایی و اصلاح‌شده حلقه رندر کارت‌های حوادث در فایل page.tsx: */}
+        {processedIncidents.map((inc) => {
+          // بررسی محدودیت تک مأموریتی بر اساس وجود نام همیار در لیست اعزام هر حادثه
+          const isAssignedToThis = inc.assignedHamyars && inc.assignedHamyars.includes(loggedInHamyar?.fullName || '');
+          const hasAnyActiveMission = incidents.some(i => 
+            i.assignedHamyars && 
+            i.assignedHamyars.includes(loggedInHamyar?.fullName || '')
+          );
+          const mapUrl = getIncidentMapUrl(inc);
 
-                          <div className={`flex wrap items-center justify-between border-t pt-2 gap-2 ${darkMode ? 'border-slate-700' : 'border-black/5'}`}>
-                            <div className="flex gap-2">
-                              <button type="button" onClick={() => handleVote(inc.id, 'like')} className="flex items-center gap-1 bg-red-500/10 text-red-600 px-2 py-1 rounded-lg text-[10px]"><ThumbsUp className="w-3 h-3" /> <span>({inc.likes})</span></button>
-                              <button type="button" onClick={() => handleVote(inc.id, 'dislike')} className="flex items-center gap-1 bg-red-500/10 text-red-600 px-2 py-1 rounded-lg text-[10px]"><ThumbsDown className="w-3 h-3" /> <span>({inc.dislikes})</span></button>
-                            </div>
-                            {isHamyarLoggedIn && (
-                              <button type="button" onClick={() => setPendingMissionIncidentId(inc.id)} className="bg-gradient-to-r from-red-600 to-red-700 text-white px-2.5 py-1 rounded-xl text-[10px] font-black shadow-md flex items-center gap-1 transition"><Truck className="w-3 h-3" /> <span>قبول ماموریت</span></button>
-                            )}
-                          </div>
-
-                          {isAdminLoggedIn && (
-                            <div className={`flex gap-2 pt-2 border-t ${darkMode ? 'border-slate-700' : 'border-black/5'}`}>
-                              <button 
-                                type="button" 
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(`/api/incidents/${inc.id}/status`, {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ status: 'تایید شده' })
-                                    });
-                                    if (res.ok) {
-                                      setIncidents(prev => prev.map(i => i.id === inc.id ? {...i, status: 'تایید شده'} : i));
-                                      const updated = await fetch('/api/incidents').then(r => r.json());
-                                      setIncidents(updated);
-                                    } else {
-                                      alert('خطا در تایید حادثه');
-                                    }
-                                  } catch (e) {
-                                    alert('خطای شبکه');
-                                  }
-                                }} 
-                                className="flex-1 bg-red-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow"
-                              >
-                                تایید ستاد
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={async () => {
-                                  if (!confirm('آیا از حذف این گزارش اطمینان دارید؟')) return;
-                                  try {
-                                    const res = await fetch(`/api/incidents/${inc.id}`, { method: 'DELETE' });
-                                    if (res.ok) {
-                                      setIncidents(prev => prev.filter(i => i.id !== inc.id));
-                                      const updated = await fetch('/api/incidents').then(r => r.json());
-                                      setIncidents(updated);
-                                    } else {
-                                      alert('خطا در حذف حادثه');
-                                    }
-                                  } catch (e) {
-                                    alert('خطای شبکه');
-                                  }
-                                }} 
-                                className="flex-1 bg-slate-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow"
-                              >
-                                حذف گزارش
-                              </button>
-                            </div>
-                          )}
-                        </div>
+          return (
+            <div key={inc.id} className={`border rounded-2xl p-4 flex flex-col justify-between space-y-3 relative shadow-sm ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-red-200 text-slate-900 shadow-sm'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {getCrisisIconComponent(inc.type, severityColor)}
+                  <div>
+                    <h4 className="text-xs font-black">{inc.type}</h4>
+                    <p className="text-[9px] text-slate-500 font-mono mt-0.5">گزارش‌دهنده: {inc.reporterName}</p>
+                  </div>
+                </div>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded text-white font-mono shrink-0" style={{ backgroundColor: severityColor }}>{inc.severityValue}%</span>
+              </div>
+              <p className="text-xs leading-relaxed min-h-[35px] font-bold">{inc.description}</p>
+              
+              <div className="flex flex-col gap-1 text-[10px] font-bold">
+                <div className="text-slate-400">📍 آدرس دستی کاربر: {inc.manualAddress || 'ثبت نشده'}</div>
+                <div className="text-slate-400">🗺️ موقعیت نقشه: lat: {inc.mapLat ?? inc.lat}, lng: {inc.mapLng ?? inc.lng}</div>
+                {mapUrl ? (
+                  <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex w-max items-center gap-1 text-red-500 hover:text-red-400 underline underline-offset-2 font-black">
+                    <MapPin className="w-3 h-3" /> مشاهده موقعیت روی نقشه
+                  </a>
+                ) : (
+                  <span className="text-slate-500">موقعیت قابل نمایش ثبت نشده است.</span>
+                )}
+                <div className="text-red-600 font-sans">وضعیت فوریت: {inc.status}</div>
+                <div className="text-slate-400">🏙️ شهر: {inc.city || 'ثبت نشده'}</div>
+                
+                {/* 🟢 نمایش اختصاصی لیست داوطلبین اعزام شده به این نقطه پدافندی */}
+                <div className="mt-2 pt-2 border-t border-slate-700/40">
+                  <span className="text-slate-400 block font-black mb-1">👥 لیست داوطلبین و همیاران اعزام شده:</span>
+                  {inc.assignedHamyars && inc.assignedHamyars.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {inc.assignedHamyars.map((name, idx) => (
+                        <span key={idx} className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-lg text-[9px] font-black">
+                          💂‍♂️ {name}
+                        </span>
                       ))}
+                    </div>
+                  ) : (
+                    <span className="text-slate-500 text-[9px] italic font-medium">هنوز هیچ نیرو و امدادگری به این موقعیت اعزام نشده است</span>
+                  )}
+                </div>
+              </div>
+
+              <div className={`flex wrap items-center justify-between border-t pt-2 gap-2 ${darkMode ? 'border-slate-700' : 'border-black/5'}`}>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => handleVote(inc.id, 'like')} className="flex items-center gap-1 bg-red-500/10 text-red-600 px-2 py-1 rounded-lg text-[10px]"><ThumbsUp className="w-3 h-3" /> <span>({inc.likes})</span></button>
+                  <button type="button" onClick={() => handleVote(inc.id, 'dislike')} className="flex items-center gap-1 bg-red-500/10 text-red-600 px-2 py-1 rounded-lg text-[10px]"><ThumbsDown className="w-3 h-3" /> <span>({inc.dislikes})</span></button>
+                </div>
+                
+                {isHamyarLoggedIn && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (isAssignedToThis) {
+                        alert('شما قبلاً اعزام این مأموریت را تایید کرده‌اید.');
+                        return;
+                      }
+                      if (hasAnyActiveMission) {
+                        alert('🚫 محدودیت مأموریت: شما در حال حاضر یک مأموریت فعال در سیستم دارید. امکان اعزام همزمان به دو حادثه وجود ندارد.');
+                        return;
+                      }
+                      setPendingMissionIncidentId(inc.id);
+                      setMissionAgreementChecked(false);
+                    }} 
+                    disabled={isAssignedToThis || (hasAnyActiveMission && !isAssignedToThis)}
+                    className={`px-2.5 py-1 rounded-xl text-[10px] font-black shadow-md flex items-center gap-1 transition ${
+                      isAssignedToThis
+                        ? 'bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 cursor-not-allowed shadow-none'
+                        : (hasAnyActiveMission && !isAssignedToThis)
+                          ? 'bg-slate-800 text-slate-500 border border-slate-700/30 cursor-not-allowed shadow-none opacity-40'
+                          : 'bg-gradient-to-r from-red-600 to-red-700 text-white hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    <Truck className="w-3 h-3" /> 
+                    <span>
+                      {isAssignedToThis 
+                        ? 'تحت کنترل شما' 
+                        : (hasAnyActiveMission && !isAssignedToThis)
+                          ? 'محدودیت تک‌مأموریتی'
+                          : 'قبول مأموریت'}
+                    </span>
+                  </button>
+                )}
+              </div>
+
+{isAdminLoggedIn && (
+                <div className={`flex gap-2 pt-2 border-t ${darkMode ? 'border-slate-700' : 'border-black/5'}`}>
+                  <button 
+                    type="button" 
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/incidents/${inc.id}/status`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ status: 'تایید شده' })
+                        });
+                        if (res.ok) {
+                          setIncidents(prev => prev.map(i => i.id === inc.id ? {...i, status: 'تایید شده'} : i));
+                          const updated = await fetch('/api/incidents').then(r => r.json());
+                          setIncidents(updated);
+                        } else { alert('خطا در تایید حادثه'); }
+                      } catch (e) { alert('خطای شبکه'); }
+                    }} 
+                    className="flex-1 bg-emerald-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow"
+                  >
+                    تایید ستاد
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={async () => {
+                      if (!confirm('آیا از حذف این گزارش اطمینان دارید؟')) return;
+                      try {
+                        const res = await fetch(`/api/incidents/${inc.id}`, { method: 'DELETE' });
+                        if (res.ok) {
+                          setIncidents(prev => prev.filter(i => i.id !== inc.id));
+                          const updated = await fetch('/api/incidents').then(r => r.json());
+                          setIncidents(updated);
+                        } else { alert('خطا در حذف حادثه'); }
+                      } catch (e) { alert('خطای شبکه'); }
+                    }} 
+                    className="flex-1 bg-slate-600 text-white text-[10px] font-black h-8 rounded-xl transition shadow"
+                  >
+                    حذف گزارش
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
                     </div>
                   </div>
                 )}
@@ -2064,7 +2401,25 @@ const handleGetCurrentLocation = () => {
                             <tr key={vol.id} className={darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
                               <td className="p-3 font-black"><button type="button" onClick={() => setSelectedVolForPage(vol)} className="text-red-600 hover:underline flex items-center gap-1 font-black"><Eye className="w-3 h-3" /> <span>{vol.fullName}</span></button></td>
                               <td className="p-3 font-bold">{vol.gender || '-'}</td>
-                              <td className="p-3 font-bold">{vol.city || '-'}</td>
+                              <td className="p-3 font-bold">
+                                {vol.city ? (
+                                  <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-black ${
+                                    darkMode
+                                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                                      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  }`}>
+                                    شهر محل سکونت: {vol.city}
+                                  </span>
+                                ) : (
+                                  <span className={`inline-flex rounded-lg border px-2 py-1 text-[10px] font-bold ${
+                                    darkMode
+                                      ? 'border-slate-700 bg-slate-800 text-slate-400'
+                                      : 'border-slate-200 bg-slate-100 text-slate-500'
+                                  }`}>
+                                    شهر ثبت نشده
+                                  </span>
+                                )}
+                              </td>
                               <td className="p-3 font-mono font-bold">{vol.phone}</td>
                               <td className="p-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-500/20 text-red-700">{vol.status}</span></td>
                               <td className="p-3 flex justify-center gap-2">
@@ -2077,16 +2432,17 @@ const handleGetCurrentLocation = () => {
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ status: 'تایید شده' })
                                       });
+                                      const result = await res.json();
                                       if (res.ok) {
-                                        setVolunteers(prev => prev.map(v => v.id === vol.id ? {...v, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : v));
+                                        setVolunteers(prev => prev.map(v => v.id === vol.id ? {...v, status: 'تایید شده', rank: 'امدادگر رسمی'} : v));
                                         const updated = await fetch('/api/volunteers').then(r => r.json());
                                         setVolunteers(updated);
                                         if (selectedVolForPage && selectedVolForPage.id === vol.id) {
-                                          setSelectedVolForPage(prev => prev ? {...prev, status: 'تایید شده', fixedPassword: 'hamyar456', rank: 'امدادگر رسمی'} : null);
+                                          setSelectedVolForPage(prev => prev ? {...prev, status: 'تایید شده', rank: 'امدادگر رسمی'} : null);
                                         }
-                                        alert('✅ پرونده همیار داوطلب تایید صلاحیت گردید و دسترسی سیستم صادر شد.');
+                                        alert(result.warning ? `⚠️ ${result.warning}` : '✅ پرونده تأیید و رمز موقت از طریق پیامک ارسال شد.');
                                       } else {
-                                        alert('خطا در تایید داوطلب');
+                                        alert(`❌ ${result.error || 'خطا در تایید داوطلب'}`);
                                       }
                                     } catch (e) {
                                       alert('خطای شبکه');
@@ -2320,6 +2676,177 @@ const handleGetCurrentLocation = () => {
           </div>
         )}
         </section>
+        {/* 🟢 این بلوک مودال تعهدنامه را دقیقاً قبل از تگ پایانی </main> قرار بده: */}
+{/* 🟢 جایگزین نهایی و اصولی مودال تعهدنامه مأموریت در انتهای فایل page.tsx قبل از </main> : */}
+      {/* 🟢 مودال تعهدنامه - نسخه اصلاح‌شده */}
+{pendingMissionIncidentId !== null && (
+  (() => {
+    const inc = incidents.find(i => i.id === pendingMissionIncidentId);
+    if (!inc) return null;
+
+    // ✅ فقط از localStorage بخون، نه از state
+    const currentHamyar = (() => {
+      if (typeof window === 'undefined') return null;
+      try {
+        const saved = localStorage.getItem('hamyar_logged_in_data');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // اگه دیتا وجود داره ولی کامل نیست، از state استفاده کن
+          if (parsed && parsed.fullName) return parsed;
+        }
+      } catch (e) {
+        console.error('Error parsing hamyar data:', e);
+      }
+      // اگر localStorage خالی بود، از state استفاده کن
+      return loggedInHamyar || null;
+    })();
+
+    // اگه همیار پیدا نشد، پیام خطا
+    if (!currentHamyar) {
+      return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="max-w-lg w-full rounded-3xl p-6 bg-red-500/10 border border-red-500/30 text-center">
+            <p className="text-red-400 font-black text-sm">❌ اطلاعات همیار یافت نشد</p>
+            <p className="text-slate-400 text-xs mt-2">لطفاً دوباره وارد شوید</p>
+            <button 
+              onClick={() => { setPendingMissionIncidentId(null); setMissionAgreementChecked(false); }}
+              className="mt-4 bg-red-500 text-white px-6 py-2.5 rounded-xl text-xs font-black hover:bg-red-600 transition"
+            >
+              بازگشت
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className={`max-w-lg w-full rounded-3xl p-6 md:p-8 shadow-2xl border ${darkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className="flex items-center gap-3 border-b pb-4 mb-4 border-slate-700/30">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+              <ShieldAlert className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-black">تعهدنامه رسمی پذیرش مأموریت اضطراری</h3>
+              <p className="text-[10px] opacity-60">شبکه واکنش سریع همیاران ستاد مدیریت بحران</p>
+            </div>
+          </div>
+
+          <div className="space-y-4 text-xs font-bold leading-relaxed">
+            <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 space-y-1 text-slate-300">
+              <p className="text-red-400">💂‍♂️ مشخصات هویتی امدادگر همیار:</p>
+              <div className="grid grid-cols-2 gap-2 text-[11px] mt-1 font-sans text-white">
+                <div>نام همیار: {currentHamyar.fullName || 'نامشخص'}</div>
+                <div>کد ملی: {currentHamyar.nationalId || 'نامشخص'}</div>
+                <div>شماره تماس: {currentHamyar.phone || 'نامشخص'}</div>
+                <div>رتبه امدادی: {currentHamyar.rank || 'امدادگر رسمی'}</div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">
+              <p className="font-black">📋 مشخصات حادثه هدف:</p>
+              <p className="text-[11px] mt-1">نوع بحران: {inc.type}</p>
+              <p className="text-[11px] truncate">موقعیت آدرس: {inc.manualAddress || inc.description}</p>
+              {getIncidentMapUrl(inc) ? (
+                <a href={getIncidentMapUrl(inc)!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-2 text-[11px] font-black underline underline-offset-2">
+                  <MapPin className="w-3 h-3" /> باز کردن در نقشه
+                </a>
+              ) : (
+                <p className="text-[10px] mt-2 opacity-70">موقعیت قابل نمایش ثبت نشده است.</p>
+              )}
+            </div>
+
+            <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-amber-500 text-[11px] space-y-1">
+              <p className="font-black">⚖️ مفاد و بندهای تعهدنامه عملیاتی:</p>
+              <p>۱. اینجانب صحت کلیه اطلاعات هویتی فوق را تایید نموده و مسئولیت آن را می‌پذیرم.</p>
+              <p>۲. متعهد می‌شوم در اسرع وقت و بدون فوت وقت به محل دقیق حادثه اعزام شوم.</p>
+              <p>۳. تایید می‌نمایم که در حال حاضر هیچ مأموریت فعال دیگری در سامانه پدافند ندارم.</p>
+            </div>
+
+            <label className="flex items-start gap-2 cursor-pointer p-2 rounded-xl hover:bg-slate-800/50 transition">
+              <input
+                type="checkbox"
+                checked={missionAgreementChecked}
+                onChange={(e) => setMissionAgreementChecked(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-red-500 cursor-pointer"
+              />
+              <span className="text-[11px] font-black">
+                اینجانب {currentHamyar.fullName}، کلیه مفاد تعهدنامه فوق را مطالعه کرده و با آگاهی کامل مسئولیت آن را می‌پذیرم.
+              </span>
+            </label>
+          </div>
+
+          <div className="flex gap-3 mt-6 pt-4 border-t border-slate-700/30">
+            <button
+              type="button"
+              onClick={() => { setPendingMissionIncidentId(null); setMissionAgreementChecked(false); }}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-black py-2.5 rounded-xl transition"
+            >
+              انصراف و لغو اعزام
+            </button>
+            <button
+  type="button"
+  disabled={!missionAgreementChecked || missionLoading}
+  onClick={async () => {
+    setMissionLoading(true);
+    try {
+      // ✅ اطلاعات همیار رو از localStorage بگیر
+      const hamyarData = localStorage.getItem('hamyar_logged_in_data');
+      const hamyar = hamyarData ? JSON.parse(hamyarData) : null;
+      
+      if (!hamyar) {
+        alert('❌ اطلاعات همیار یافت نشد. لطفاً دوباره وارد شوید.');
+        setMissionLoading(false);
+        return;
+      }
+
+      const res = await fetch(`/api/incidents/${inc.id}/assign`, { method: 'POST' });
+      const result = await res.json();
+      
+      if (res.ok) {
+        // ✅ آپدیت محلی incidents
+        setIncidents(prev => prev.map(i => {
+          if (i.id === inc.id) {
+            const currentAssigned = i.assignedHamyars || [];
+            if (!currentAssigned.includes(hamyar.fullName)) {
+              return {
+                ...i,
+                status: 'تحت کنترل همیار (اعزام نیرو)',
+                assignedHamyars: [...currentAssigned, hamyar.fullName]
+              };
+            }
+          }
+          return i;
+        }));
+        
+        alert(result.warning ? `✅ مأموریت ثبت شد. ${result.warning}` : `✅ مأموریت با موفقیت به نام ${hamyar.fullName} ثبت و پیامک آن ارسال شد.`);
+        
+        await refreshIncidents();
+        
+        setPendingMissionIncidentId(null);
+        setMissionAgreementChecked(false);
+      } else {
+        alert(`❌ خطای ستاد: ${result.error || 'خطا در ثبت مأموریت'}`);
+      }
+    } catch (e) { 
+      alert('❌ خطای شبکه ارتباطی سرور ستاد'); 
+    } finally { 
+      setMissionLoading(false); 
+    }
+  }}
+  className={`flex-1 text-xs font-black py-2.5 rounded-xl transition shadow-md flex items-center justify-center gap-1 ${
+    missionAgreementChecked && !missionLoading ? 'bg-gradient-to-r from-red-600 to-red-700 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+  }`}
+>
+  {missionLoading ? '⏳ در حال ثبت...' : '🚀 تایید و اعزام به محل'}
+</button>
+            
+          </div>
+        </div>
+      </div>
+    );
+  })()
+)}
     </main>
   );
 }

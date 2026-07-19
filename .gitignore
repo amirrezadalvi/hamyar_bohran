@@ -1,7 +1,19 @@
-node_modules/ 
-.next/ 
-out/ 
+node_modules/
+.next/
+out/
 build/
+
+# Database
 *.db
 *.sqlite
-.env.local
+*.sqlite3
+data/*.sqlite-*
+
+# Environment secrets
+.env*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Test files
+test-s3.mjs

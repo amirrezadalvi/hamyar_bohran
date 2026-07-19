@@ -51,3 +51,25 @@
     filter: drop-shadow(0 0 20px #ef4444);
   }
 }
+
+.cursor-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle 190px at var(--cursor-x, -300px) var(--cursor-y, -300px), rgba(239, 68, 68, var(--cursor-glow-opacity)), transparent 72%);
+}
+
+.cursor-glow-dark {
+  --cursor-glow-opacity: 0.12;
+}
+
+.cursor-glow-light {
+  --cursor-glow-opacity: 0.06;
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .cursor-glow {
+    display: none;
+  }
+}

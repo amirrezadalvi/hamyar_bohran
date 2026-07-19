@@ -1,15 +1,20 @@
 import crypto from 'crypto';
 
-const NAVIDAA_API_KEY = process.env.NAVIDAA_API_KEY || "navidaa_live_50fdb6c228f23956277cd71d281906243ff67a66a3d4a394914b46cc4030ea4d";
+const NAVIDAA_API_KEY = process.env.NAVIDAA_API_KEY;
 const NAVIDAA_BASE_URL = "https://api.navidaa.ir";
 
-function createMessageIdempotencyKey(phone: string): string {
-  const cleanPhone = phone.trim();
+function createMessageIdempotencyKey(): string {
   const randomHex = crypto.randomBytes(4).toString('hex');
-  return `msg-${cleanPhone}-${Math.floor(Date.now() / 1000)}-${randomHex}`;
+  return `msg-${Math.floor(Date.now() / 1000)}-${randomHex}`;
 }
 
-export async function sendNavidaaMessage(phone: string, messageText: string) {
+export async function sendNavidaaMessage(phone: string, messageText: string, idempotencyKey?: string) {
+  if (process.env.SMS_DISABLED === 'true') {
+    return { success: true, disabled: true };
+  }
+  if (!NAVIDAA_API_KEY) {
+    return { success: false, error: 'Navidaa API key is not configured' };
+  }
   const url = `${NAVIDAA_BASE_URL}/v1/messages/send`;
   
   const payload = {
@@ -28,20 +33,20 @@ export async function sendNavidaaMessage(phone: string, messageText: string) {
       headers: {
         'X-API-Key': NAVIDAA_API_KEY,
         'Content-Type': 'application/json',
-        'Idempotency-Key': createMessageIdempotencyKey(phone)
+        'Idempotency-Key': idempotencyKey || createMessageIdempotencyKey()
       },
       body: JSON.stringify(payload)
     });
 
     if (response.status === 201) {
       const data = await response.json();
-      console.log("✅ Navidaa Response:", JSON.stringify(data, null, 2));
+      console.log('✅ Navidaa message accepted by provider');
       return { success: true, data };
     }
     
-    const errorText = await response.text();
-    console.error("🔴 Navidaa Error:", response.status, errorText);
-    return { success: false, error: `Navidaa error ${response.status}: ${errorText}` };
+    await response.text();
+    console.error('🔴 Navidaa provider rejected message:', response.status);
+    return { success: false, error: `Navidaa error ${response.status}` };
   } catch (error: any) {
     console.error("🔴 Navidaa Fetch Error:", error.message);
     return { success: false, error: `Navidaa connection error: ${error.message}` };

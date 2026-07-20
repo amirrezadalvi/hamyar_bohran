@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, CheckCircle, Globe2, ShieldAlert, Users } from 'lucide-react';
 
 export interface HomepageStatistics {
   registeredVolunteers: number;
@@ -111,12 +112,35 @@ export default function HomepageCircularStatistics({ statistics, loadingError, d
     return () => cancelAnimationFrame(frame);
   }, [isVisible, statistics]);
 
+  const activeIncidents = statistics
+    ? Math.max(0, statistics.registeredIncidents - statistics.approvedIncidents - statistics.rejectedIncidents)
+    : 0;
+  const responseRate = statistics && statistics.registeredIncidents > 0
+    ? Math.round((statistics.approvedIncidents / statistics.registeredIncidents) * 100)
+    : 0;
+  const kpis = [
+    { label: 'کل حوادث ثبت‌شده', value: statistics?.registeredIncidents, icon: ShieldAlert, accent: darkMode ? 'text-slate-100' : 'text-[#020617]', iconSurface: 'bg-slate-200 border-slate-400 dark:bg-slate-500/10 dark:border-current/10', edge: 'border-t-[#0F172A]', labelAccent: darkMode ? 'text-slate-400' : 'text-[#0F172A]' },
+    { label: 'حوادث در حال بررسی', value: statistics ? activeIncidents : undefined, icon: Activity, accent: 'text-[#DC2626] dark:text-red-400', iconSurface: 'bg-red-50 border-current/10 dark:bg-red-500/10', edge: 'border-t-[#DC2626]' },
+    { label: 'داوطلبان ثبت‌شده', value: statistics?.registeredVolunteers, icon: Users, accent: 'text-[#2563EB] dark:text-blue-400', iconSurface: 'bg-blue-50 border-current/10 dark:bg-blue-500/10', edge: 'border-t-[#2563EB]' },
+    { label: 'شهرهای تحت پوشش', value: statistics?.coveredCities, icon: Globe2, accent: 'text-[#2563EB] dark:text-slate-300', iconSurface: 'bg-blue-50 border-current/10 dark:bg-slate-500/10', edge: 'border-t-[#2563EB]' },
+    { label: 'نرخ پاسخ تأییدشده', value: statistics ? responseRate : undefined, suffix: '%', icon: CheckCircle, accent: 'text-[#16A34A] dark:text-emerald-400', iconSurface: 'bg-green-50 border-current/10 dark:bg-emerald-500/10', edge: 'border-t-[#16A34A]' }
+  ];
+
   return (
-    <section ref={sectionRef} aria-labelledby="homepage-statistics-title" className="max-w-5xl mx-auto space-y-4">
-      <div className="text-center space-y-1">
-        <h2 id="homepage-statistics-title" className={`text-base md:text-xl font-black ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>
-          آمار زنده شبکه همیار بحران
-        </h2>
+    <section ref={sectionRef} aria-labelledby="homepage-statistics-title" className="space-y-4 md:space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+        <div>
+          <p className="text-[10px] md:text-xs font-black text-blue-600 dark:text-blue-400">نمای لحظه‌ای شبکه</p>
+          <h2 id="homepage-statistics-title" className={`mt-1 text-lg md:text-2xl font-black tracking-tight ${darkMode ? 'text-slate-100' : 'text-[#0F172A]'}`}>
+            شاخص‌های کلیدی عملیات
+          </h2>
+        </div>
+        <span className={`w-fit inline-flex items-center gap-2.5 rounded-full border px-4 py-2 text-[11px] font-bold shadow-sm ${
+          darkMode ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-emerald-50 border-emerald-300 text-emerald-700'
+        }`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          داده‌های زنده سامانه
+        </span>
       </div>
 
       {loadingError ? (
@@ -125,7 +149,27 @@ export default function HomepageCircularStatistics({ statistics, loadingError, d
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6" dir="rtl">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4" dir="rtl">
+            {kpis.map(kpi => (
+              <article key={kpi.label} className={`rounded-2xl border p-4 md:p-5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 ${
+                darkMode
+                  ? 'min-h-[142px] border-slate-800 bg-slate-900/90 shadow-[0_10px_28px_rgba(0,0,0,.22)] hover:border-slate-700 hover:shadow-[0_16px_36px_rgba(0,0,0,.3)]'
+                  : `min-h-[150px] border-slate-200 border-t-[3px] ${kpi.edge} bg-white shadow-[0_10px_26px_rgba(15,23,42,.075)] hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,.13)]`
+              }`}>
+                <div className={`${darkMode ? 'w-10 h-10' : 'w-11 h-11'} rounded-xl border flex items-center justify-center ${kpi.iconSurface}`}>
+                  <kpi.icon className={`${darkMode ? 'w-5 h-5' : 'w-6 h-6'} ${kpi.accent}`} />
+                </div>
+                <div className="mt-3">
+                  <div className={`font-sans leading-none tracking-tight tabular-nums ${darkMode ? 'text-[35px] md:text-[36px] font-black' : 'text-[30px] md:text-[32px] font-extrabold'} ${kpi.accent}`}>
+                    {statistics ? (kpi.value ?? 0).toLocaleString('en-US') : '…'}{statistics && kpi.suffix}
+                  </div>
+                  <p className={`mt-2.5 text-[10px] md:text-[11px] font-semibold leading-5 ${('labelAccent' in kpi ? kpi.labelAccent : undefined) ?? (darkMode ? 'text-slate-400' : 'text-slate-500')}`}>{kpi.label}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" dir="rtl">
             {(statistics ? donuts : [
               { title: 'کل داوطلبان', total: 0, segments: [] },
               { title: 'کل حوادث ثبت شده', total: 0, segments: [] }
@@ -134,15 +178,15 @@ export default function HomepageCircularStatistics({ statistics, loadingError, d
               return (
                 <article
                   key={donut.title}
-                  className={`rounded-3xl border p-4 md:p-6 transition-transform duration-300 hover:-translate-y-1 ${
+                  className={`rounded-2xl border p-4 md:p-5 flex flex-col sm:flex-row items-center gap-4 md:gap-6 ${
                     darkMode
-                      ? 'border-slate-700/70 bg-gradient-to-br from-slate-950 to-slate-900 shadow-[0_16px_35px_rgba(0,0,0,0.28)]'
-                      : 'border-slate-200 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.08)]'
+                      ? 'border-slate-800 bg-slate-900/70'
+                      : 'border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,.045)]'
                   }`}
                 >
-                  <div className="relative mx-auto h-40 w-40 md:h-48 md:w-48">
+                  <div className="relative shrink-0 h-32 w-32 md:h-36 md:w-36">
                     <svg viewBox="0 0 120 120" className="-rotate-90 h-full w-full" aria-hidden="true">
-                      <circle cx="60" cy="60" r={RADIUS} fill="none" stroke={darkMode ? '#1e293b' : '#e2e8f0'} strokeWidth="11" />
+                      <circle cx="60" cy="60" r={RADIUS} fill="none" stroke={darkMode ? '#1e293b' : '#e2e8f0'} strokeWidth={darkMode ? 9 : 11} />
                       {donut.segments.map(segment => {
                         const fraction = donut.total > 0 ? segment.value / donut.total : 0;
                         const start = cumulative;
@@ -155,34 +199,35 @@ export default function HomepageCircularStatistics({ statistics, loadingError, d
                             r={RADIUS}
                             fill="none"
                             stroke={segment.color}
-                            strokeWidth="11"
+                            strokeWidth={darkMode ? 9 : 11}
                             strokeDasharray={`${CIRCUMFERENCE * fraction * progress[chartIndex]} ${CIRCUMFERENCE}`}
                             strokeDashoffset={-CIRCUMFERENCE * start}
-                            strokeLinecap="butt"
+                            strokeLinecap={darkMode ? 'butt' : 'round'}
                           />
                         );
                       })}
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className={`font-mono text-2xl md:text-3xl font-black tabular-nums ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                      <span className={`font-sans tabular-nums ${darkMode ? 'text-xl md:text-2xl font-black text-white' : 'text-2xl md:text-[28px] font-extrabold text-[#0F172A]'}`}>
                         {statistics
-                          ? Math.round(donut.total * progress[chartIndex]).toLocaleString('fa-IR')
+                          ? Math.round(donut.total * progress[chartIndex]).toLocaleString('en-US')
                           : '…'}
                       </span>
-                      <span className={`mt-1 text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <span className={`mt-1 text-[10px] font-extrabold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         {donut.title}
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-3 space-y-2">
+                  <div className="w-full flex-1 space-y-2">
+                    <h3 className={`mb-3 text-sm font-extrabold ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>ترکیب وضعیت {donut.title}</h3>
                     {donut.segments.map(segment => (
-                      <div key={segment.label} className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-[11px] font-bold ${darkMode ? 'bg-slate-800/70 text-slate-200' : 'bg-slate-50 text-slate-700'}`}>
+                      <div key={segment.label} className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-[11px] font-bold ${darkMode ? 'border-transparent bg-slate-800/70 text-slate-200' : 'border-slate-100 bg-white text-slate-700 shadow-[0_2px_8px_rgba(15,23,42,.035)]'}`}>
                         <span className="flex min-w-0 items-center gap-2">
                           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
                           <span className="truncate">{segment.label}</span>
                         </span>
-                        <span className="shrink-0 font-mono font-black">{segment.value.toLocaleString('fa-IR')}</span>
+                        <span className="shrink-0 font-sans font-extrabold tabular-nums">{segment.value.toLocaleString('en-US')}</span>
                       </div>
                     ))}
                   </div>
@@ -191,11 +236,6 @@ export default function HomepageCircularStatistics({ statistics, loadingError, d
             })}
           </div>
 
-          {statistics && (
-            <div className={`mx-auto w-fit rounded-2xl border px-4 py-2 text-[11px] font-bold ${darkMode ? 'border-purple-500/30 bg-purple-500/10 text-purple-200' : 'border-purple-200 bg-purple-50 text-purple-800'}`}>
-              شهرهای دارای داوطلب تأییدشده: <span className="font-mono font-black">{statistics.coveredCities.toLocaleString('fa-IR')}</span>
-            </div>
-          )}
         </>
       )}
     </section>

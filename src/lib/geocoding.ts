@@ -30,10 +30,14 @@ const geocodingGlobal = globalThis as typeof globalThis & {
 const resultCache = geocodingGlobal.__hamyarGeocodeCache ||= new Map();
 const pendingRequests = geocodingGlobal.__hamyarGeocodePending ||= new Map();
 const CACHE_TTL_MS = 15 * 60 * 1000;
-const PROVIDER_TIMEOUTS_MS = [2200, 1000] as const;
+const FALLBACK_CACHE_TTL_MS = 60 * 1000;
+const PRIMARY_TIMEOUTS_MS = [4000, 3500] as const;
+const SECONDARY_TIMEOUT_MS = 3000;
 const ADDRESS_FALLBACK_MESSAGE = 'آدرس دقیق موقتاً در دسترس نیست، موقعیت روی نقشه ذخیره شد.';
-const PROVIDER_URL = process.env.REVERSE_GEOCODING_PROVIDER_URL?.trim()
+const PRIMARY_PROVIDER_URL = process.env.REVERSE_GEOCODING_PROVIDER_URL?.trim()
   || 'https://nominatim.openstreetmap.org/reverse';
+const SECONDARY_PROVIDER_URL = process.env.REVERSE_GEOCODING_FALLBACK_URL?.trim()
+  || 'https://api.bigdatacloud.net/data/reverse-geocode-client';
 
 export function areValidCoordinates(lat: number, lng: number): boolean {
   return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
@@ -111,60 +115,131 @@ function conciseAddress(data: any, fallbackCity: string): string {
   return fallbackCity === 'سایر شهرهای ایران' ? 'موقعیت انتخاب‌شده روی نقشه' : fallbackCity;
 }
 
+type ProviderAttempt = {
+  name: string;
+  url: string;
+  timeoutMs: number;
+  attempt: number;
+  normalize?: (data: any) => any;
+};
+
+function secondaryProviderData(data: any): any {
+  const locality = typeof data?.locality === 'string' ? data.locality : '';
+  const city = typeof data?.city === 'string' ? data.city : '';
+  const state = typeof data?.principalSubdivision === 'string' ? data.principalSubdivision : '';
+  const country = typeof data?.countryName === 'string' ? data.countryName : '';
+  return {
+    address: {
+      city: locality || city,
+      town: city || locality,
+      state,
+      country,
+      postcode: typeof data?.postcode === 'string' ? data.postcode : ''
+    },
+    display_name: [locality, city, state, country].filter(Boolean).join(', ')
+  };
+}
+
+async function requestProviderAttempt(provider: ProviderAttempt, coordinateLog: string): Promise<any> {
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  const timeout = setTimeout(
+    () => controller.abort(new DOMException(`Provider timeout after ${provider.timeoutMs}ms`, 'TimeoutError')),
+    provider.timeoutMs
+  );
+  try {
+    const response = await fetch(provider.url, {
+      headers: { Accept: 'application/json', 'Accept-Language': 'fa', 'User-Agent': 'Hamyar-Bohran/1.0' },
+      signal: controller.signal,
+      cache: 'no-store'
+    });
+    const responseTimeMs = Date.now() - startedAt;
+    if (!response.ok) {
+      const reason = response.status === 429 ? 'rate_limited' : `http_${response.status}`;
+      console.warn(
+        `[reverse-geocode] provider=${provider.name} attempt=${provider.attempt} status=${response.status} responseTimeMs=${responseTimeMs} fallbackReason=${reason} coordinates=${coordinateLog}`
+      );
+      throw new GeocodingProviderError('temporary', `${provider.name} rejected the request (${response.status})`);
+    }
+    const rawData = await response.json();
+    const data = provider.normalize ? provider.normalize(rawData) : rawData;
+    const hasAddress = data?.address && typeof data.address === 'object'
+      && Object.values(data.address).some(value => typeof value === 'string' && value.trim());
+    const hasDisplayName = typeof data?.display_name === 'string' && data.display_name.trim();
+    if (!data || typeof data !== 'object' || (!hasAddress && !hasDisplayName)) {
+      console.warn(
+        `[reverse-geocode] provider=${provider.name} attempt=${provider.attempt} status=${response.status} responseTimeMs=${responseTimeMs} fallbackReason=unusable_response coordinates=${coordinateLog}`
+      );
+      throw new GeocodingProviderError('temporary', `${provider.name} returned no usable address`);
+    }
+    console.info(
+      `[reverse-geocode] provider=${provider.name} attempt=${provider.attempt} status=${response.status} responseTimeMs=${responseTimeMs} result=success coordinates=${coordinateLog}`
+    );
+    return data;
+  } catch (error) {
+    if (error instanceof GeocodingProviderError) throw error;
+    const responseTimeMs = Date.now() - startedAt;
+    const timedOut = controller.signal.aborted;
+    const reason = timedOut ? 'timeout' : 'network_failure';
+    console.warn(
+      `[reverse-geocode] provider=${provider.name} attempt=${provider.attempt} responseTimeMs=${responseTimeMs} fallbackReason=${reason} coordinates=${coordinateLog}`
+    );
+    throw new GeocodingProviderError(timedOut ? 'timeout' : 'temporary', `${provider.name} ${reason}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function requestProvider(lat: number, lng: number): Promise<any> {
-  const params = new URLSearchParams({
+  const primaryParams = new URLSearchParams({
     format: 'jsonv2', lat: String(lat), lon: String(lng),
     'accept-language': 'fa', addressdetails: '1', zoom: '16'
   });
+  const secondaryParams = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lng),
+    localityLanguage: 'fa'
+  });
   const coordinateLog = `${lat.toFixed(4)},${lng.toFixed(4)}`;
   let lastFailure: 'timeout' | 'temporary' = 'temporary';
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const controller = new AbortController();
-    const timeoutMs = PROVIDER_TIMEOUTS_MS[attempt];
-    const timeout = setTimeout(
-      () => controller.abort(new DOMException(`Provider timeout after ${timeoutMs}ms`, 'TimeoutError')),
-      timeoutMs
-    );
+  for (let attempt = 0; attempt < PRIMARY_TIMEOUTS_MS.length; attempt++) {
     try {
-      const response = await fetch(`${PROVIDER_URL}?${params}`, {
-        headers: { Accept: 'application/json', 'Accept-Language': 'fa', 'User-Agent': 'Hamyar-Bohran/1.0' },
-        signal: controller.signal,
-        cache: 'no-store'
-      });
-      console.info(
-        `[reverse-geocode] provider status=${response.status} attempt=${attempt + 1} coordinates=${coordinateLog}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        const hasAddress = data?.address && typeof data.address === 'object'
-          && Object.keys(data.address).length > 0;
-        const hasDisplayName = typeof data?.display_name === 'string' && data.display_name.trim();
-        if (data && typeof data === 'object' && (hasAddress || hasDisplayName)) return data;
-        lastFailure = 'temporary';
-        console.warn(
-          `[reverse-geocode] unusable provider response attempt=${attempt + 1} coordinates=${coordinateLog}`
-        );
-        continue;
-      }
-      if (response.status < 500 && response.status !== 429) {
-        throw new GeocodingProviderError('temporary', `Provider rejected the request (${response.status})`);
-      }
-      lastFailure = 'temporary';
+      return await requestProviderAttempt({
+        name: 'nominatim',
+        url: `${PRIMARY_PROVIDER_URL}?${primaryParams}`,
+        timeoutMs: PRIMARY_TIMEOUTS_MS[attempt],
+        attempt: attempt + 1
+      }, coordinateLog);
     } catch (error) {
-      if (error instanceof GeocodingProviderError) throw error;
-      const timedOut = controller.signal.aborted;
-      lastFailure = timedOut ? 'timeout' : 'temporary';
-      console.warn(
-        `[reverse-geocode] ${timedOut ? `timeout after ${timeoutMs}ms` : 'temporary network failure'} attempt=${attempt + 1} coordinates=${coordinateLog}`
-      );
-    } finally {
-      clearTimeout(timeout);
+      lastFailure = error instanceof GeocodingProviderError ? error.kind : 'temporary';
+      if (attempt < PRIMARY_TIMEOUTS_MS.length - 1) {
+        console.info(
+          `[reverse-geocode] provider=nominatim next=retry fallbackReason=${lastFailure} coordinates=${coordinateLog}`
+        );
+      }
     }
   }
-  throw new GeocodingProviderError(
-    lastFailure,
-    lastFailure === 'timeout' ? 'Reverse-geocoding provider timed out' : 'Reverse-geocoding provider is temporarily unavailable'
+
+  console.info(
+    `[reverse-geocode] provider=nominatim next=secondary fallbackReason=${lastFailure} coordinates=${coordinateLog}`
   );
+  try {
+    return await requestProviderAttempt({
+      name: 'bigdatacloud',
+      url: `${SECONDARY_PROVIDER_URL}?${secondaryParams}`,
+      timeoutMs: SECONDARY_TIMEOUT_MS,
+      attempt: 1,
+      normalize: secondaryProviderData
+    }, coordinateLog);
+  } catch (error) {
+    lastFailure = error instanceof GeocodingProviderError ? error.kind : 'temporary';
+    throw new GeocodingProviderError(
+      lastFailure,
+      lastFailure === 'timeout'
+        ? 'Reverse-geocoding providers timed out'
+        : 'Reverse-geocoding providers are temporarily unavailable'
+    );
+  }
 }
 
 export async function reverseGeocodeIranianCity(
@@ -187,14 +262,16 @@ export async function reverseGeocodeIranianCity(
       if (!options.allowProviderFallback) throw error;
       const city = nearestSupportedCity(lat, lng) || 'سایر شهرهای ایران';
       console.warn(
-        `[reverse-geocode] using coordinate fallback reason=${error instanceof GeocodingProviderError ? error.kind : 'temporary'} coordinates=${key}`
+        `[reverse-geocode] provider=coordinate-fallback responseTimeMs=0 fallbackReason=${error instanceof GeocodingProviderError ? error.kind : 'temporary'} coordinates=${key}`
       );
-      return {
+      const fallbackValue: ReverseGeocodeResult = {
         city,
         address: ADDRESS_FALLBACK_MESSAGE,
         approximate: true,
         providerAvailable: false
       };
+      resultCache.set(key, { expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS, value: fallbackValue });
+      return fallbackValue;
     }
     const detected = cityFromProvider(data, lat, lng);
     const value: ReverseGeocodeResult = {

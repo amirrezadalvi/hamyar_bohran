@@ -1,4 +1,4 @@
-'use client';import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Medal, Activity, Check, PhoneCall, LayoutDashboard, Lock, User, Smartphone, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Settings, Truck, Mail, ArrowRight, BarChart3, Globe, Monitor, ShieldCheck, Copy, ChevronDown, Home, Headphones, Upload, Send, MessageSquareCode, MapPin, FileText } from 'lucide-react';
+'use client';import { Shield, Users, Radio, ShieldAlert, AlertTriangle, UserPlus, Medal, Activity, Check, PhoneCall, LayoutDashboard, Lock, User, Smartphone, ThumbsUp, ThumbsDown, Filter, ArrowUpDown, Flame, Bomb, Wind, Sun, Moon, Eye, CheckCircle, Key, Settings, Truck, Mail, BarChart3, Globe, Monitor, ShieldCheck, Copy, ChevronDown, Home, Headphones, Upload, Send, MessageSquareCode, Bot, MapPin, FileText } from 'lucide-react';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import NeshanLocationPicker from '@/components/NeshanLocationPicker';
 import HomepageCircularStatistics, { type HomepageStatistics } from '@/components/HomepageCircularStatistics';
@@ -1042,7 +1042,7 @@ const processedIncidents = useMemo(() => {
             }`}
             title="چت‌بات هوشمند"
           >
-            <MessageSquareCode className={`w-5 h-5 md:w-6 md:h-6 ${currentView === 'home' ? 'animate-bounce' : 'animate-pulse'}`} />
+            <Bot className={`w-5 h-5 md:w-6 md:h-6 ${darkMode ? 'text-blue-400' : 'text-[#2563EB]'} ${currentView === 'home' ? 'animate-bounce' : 'animate-pulse'}`} />
           </button>
           <span className={`absolute top-full mt-2 whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow ${darkMode ? 'bg-slate-950 text-slate-300' : 'bg-slate-800 text-white'}`}>🤖 چت‌بات هوشمند</span>
         </div>
@@ -1069,72 +1069,72 @@ const processedIncidents = useMemo(() => {
 
       {/* ☀️ سوئیچر تم */}
       <div className="absolute top-4 left-4 md:left-28 z-[410] flex items-center gap-2">
-        <button type="button" onClick={toggleTheme} className={`p-2.5 rounded-xl border transition-all duration-300 ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400' : 'bg-white border-slate-300 text-slate-800 shadow-md hover:bg-slate-100'}`}>
-          {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        <button type="button" onClick={toggleTheme} className={`p-3.5 rounded-xl border transition-all duration-300 ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400' : 'bg-white border-slate-300 text-slate-800 shadow-md hover:bg-slate-100'}`}>
+          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
       </div>
 
       {/* 🖥️ سایدبار دسکتاپ */}
-      <aside className={`hidden md:flex absolute top-0 right-0 w-24 hover:w-80 h-full border-l justify-between flex-col z-[405] shadow-[-5px_0_40px_rgba(0,0,0,0.15)] transition-all duration-300 cubic-bezier(0.4, 0, 0.2, 1) group overflow-hidden ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-gradient-to-b from-pink-50 to-blue-50 border-slate-300 text-slate-900 shadow-xl'}`}>
+      <aside className={`hidden md:flex absolute top-0 right-0 w-24 hover:w-80 h-full border-l justify-between flex-col z-[405] shadow-[-5px_0_40px_rgba(0,0,0,0.15)] transition-[width] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] group overflow-hidden ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-gradient-to-b from-pink-50 to-blue-50 border-slate-300 text-slate-900 shadow-xl'}`}>
         <div className="w-full h-full p-4 flex flex-col items-center justify-start gap-6 overflow-hidden">
           <div className="flex flex-col items-center text-center gap-2 border-b border-black/5 w-full min-w-[240px] pb-4">
             <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/40 flex items-center justify-center shadow-lg shrink-0">
               <Radio className="w-7 h-7 text-red-500 animate-pulse" />
             </div>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100">
               <h1 className="text-base font-black tracking-tight">سامانه همیار بحران</h1>
               <p className="text-[9px] text-red-500 font-mono tracking-widest uppercase mt-0.5 font-black">Tactical Command Center</p>
             </div>
           </div>
 
-          <nav className="w-full flex flex-col items-center justify-start gap-3 min-w-[240px]">
-            <button onClick={() => { navigateToView('home'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'home' && !isAuthMode ? 'bg-gradient-to-r from-red-700 to-red-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-              <Home className="w-6 h-6 text-red-600 shrink-0" />
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">🏠 خانه</span>
+          <nav className="w-full flex flex-col items-center justify-start gap-3">
+            <button onClick={() => { navigateToView('home'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'home' && !isAuthMode ? 'bg-gradient-to-r from-red-700 to-red-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+              <Home className={`w-6 h-6 shrink-0 ${currentView === 'home' && !isAuthMode ? 'text-white' : 'text-red-600'}`} />
+                <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">خانه</span>
             </button>
 
-            <button onClick={() => { navigateToView('report'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'report' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-              <Shield className="w-6 h-6 text-red-500 shrink-0" />
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">🚨 لایه ثبت سریع حادثه</span>
+            <button onClick={() => { navigateToView('report'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'report' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+              <Shield className={`w-6 h-6 shrink-0 ${currentView === 'report' && !isAuthMode ? 'text-white' : 'text-red-500'}`} />
+                <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">لایه ثبت سریع حادثه</span>
             </button>
 
             {isAdminLoggedIn && (
-              <button onClick={() => { navigateToView('analytics'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'analytics' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-                <BarChart3 className="w-5 h-5 text-red-500 shrink-0" />
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">📊 پایش آمار بازدید سایت</span>
+              <button onClick={() => { navigateToView('analytics'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'analytics' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+                <BarChart3 className={`w-5 h-5 shrink-0 ${currentView === 'analytics' && !isAuthMode ? 'text-white' : 'text-red-500'}`} />
+                  <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">پایش آمار بازدید سایت</span>
               </button>
             )}
 
             {isAdminLoggedIn ? (
-              <button onClick={() => { navigateToView('admin-edit'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'admin-edit' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-                <Settings className="w-5 h-5 text-red-400 shrink-0" />
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">⚙️ ویرایش اطلاعات ادمین</span>
+              <button onClick={() => { navigateToView('admin-edit'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'admin-edit' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+                <Settings className={`w-5 h-5 shrink-0 ${currentView === 'admin-edit' && !isAuthMode ? 'text-white' : 'text-red-400'}`} />
+                  <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">ویرایش اطلاعات ادمین</span>
               </button>
             ) : (
-              <button onClick={() => { navigateToView('volunteer'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'volunteer' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-                <Users className="w-6 h-6 text-red-500 shrink-0" />
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">📝 درخواست عضویت داوطلبان</span>
+              <button onClick={() => { navigateToView('volunteer'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'volunteer' && !isAuthMode ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+                <Users className={`w-6 h-6 shrink-0 ${currentView === 'volunteer' && !isAuthMode ? 'text-white' : 'text-red-500'}`} />
+                  <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">درخواست عضویت داوطلبان</span>
               </button>
             )}
 
-            <button onClick={() => { setSelectedVolForPage(null); if (isAdminLoggedIn || isHamyarLoggedIn) { navigateToView('admin'); setIsAuthMode(false); } else { setIsAuthMode(true); } }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'admin' || isAuthMode ? 'bg-red-500 text-white scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-              <LayoutDashboard className="w-6 h-6 text-red-500 shrink-0" />
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">🔑 کارتابل همیاران رسمی</span>
+            <button onClick={() => { setSelectedVolForPage(null); if (isAdminLoggedIn || isHamyarLoggedIn) { navigateToView('admin'); setIsAuthMode(false); } else { setIsAuthMode(true); } }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'admin' || isAuthMode ? 'bg-red-500 text-white scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+              <LayoutDashboard className={`w-6 h-6 shrink-0 ${currentView === 'admin' || isAuthMode ? 'text-white' : 'text-red-500'}`} />
+                <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">کارتابل همیاران رسمی</span>
             </button>
 
-            <button onClick={() => { navigateToView('support'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'support' && !isAuthMode ? 'bg-red-500 text-white scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-              <PhoneCall className="w-6 h-6 text-red-500 shrink-0" />
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">📞 خطوط پشتیبانی فنی</span>
+            <button onClick={() => { navigateToView('support'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'support' && !isAuthMode ? 'bg-red-500 text-white scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+              <PhoneCall className={`w-6 h-6 shrink-0 ${currentView === 'support' && !isAuthMode ? 'text-white' : 'text-red-500'}`} />
+                <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">خطوط پشتیبانی فنی</span>
             </button>
 
-            <button onClick={() => { navigateToView('support-ai'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full items-center px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'support-ai' && !isAuthMode ? 'bg-gradient-to-r from-cyan-700 to-cyan-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
-              <MessageSquareCode className="w-6 h-6 text-cyan-500 shrink-0" />
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap mr-3 text-xs font-black">🤖 چت‌بات هوشمند</span>
+            <button onClick={() => { navigateToView('support-ai'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex w-full h-12 group-hover:h-auto items-center justify-center group-hover:justify-start px-4 py-3 rounded-2xl text-xs font-black transition-all duration-200 text-right ${currentView === 'support-ai' && !isAuthMode ? 'bg-gradient-to-r from-cyan-700 to-cyan-600 text-white shadow-lg scale-105' : 'text-slate-500 hover:bg-black/5 font-black'}`}>
+              <Bot className={`w-6 h-6 shrink-0 ${currentView === 'support-ai' && !isAuthMode ? 'text-white' : 'text-cyan-500'}`} />
+                <span className="absolute group-hover:static opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 whitespace-nowrap mr-3 text-xs font-black">چت‌بات هوشمند</span>
             </button>
           </nav>
         </div>
         <div className="p-4 bg-black/5 border-t border-black/10 flex flex-col gap-2 min-w-[250px]">
-          <div className="text-xs font-bold flex items-center gap-3"><span className="w-2 h-2 rounded-full bg-red-400"></span><span className="opacity-0 group-hover:opacity-100 transition-opacity font-black">شبکه مدیریت بحران</span></div>
+          <div className="text-xs font-bold flex items-center gap-3"><span className="w-2 h-2 rounded-full bg-red-400"></span><span className="opacity-0 group-hover:opacity-100 transition-opacity duration-[240ms] group-hover:delay-100 font-black">شبکه مدیریت بحران</span></div>
         </div>
       </aside>
 
@@ -1172,7 +1172,7 @@ const processedIncidents = useMemo(() => {
         </button>
 
         <button onClick={() => { navigateToView('support-ai'); setIsAuthMode(false); setSelectedVolForPage(null); }} className={`flex flex-col items-center justify-center p-1 rounded-xl transition ${currentView === 'support-ai' && !isAuthMode ? 'text-cyan-500 scale-110 font-bold' : 'text-slate-400'}`}>
-          <MessageSquareCode className="w-5 h-5" /><span className="text-[8px] mt-0.5 font-black">چت‌بات هوشمند</span>
+          <Bot className="w-5 h-5" /><span className="text-[8px] mt-0.5 font-black">چت‌بات هوشمند</span>
         </button>
       </div>
 
@@ -1181,115 +1181,133 @@ const processedIncidents = useMemo(() => {
         
         {/* 🏠 نمای واحد خانه */}
         {currentView === 'home' && !isAuthMode && (
-          <div className="w-full h-full p-4 md:p-8 overflow-y-auto space-y-8 animate-fadeIn">
-            <div className={`border rounded-3xl p-6 md:p-10 text-center transition-all duration-300 ${
-              darkMode 
-                ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-[#1e1111] border-red-900/60 shadow-[0_0_40px_rgba(220,38,38,0.12)]' 
-                : 'bg-gradient-to-br from-white via-slate-50 to-red-50/40 border-slate-200/80 shadow-[0_15px_35px_rgba(0,0,0,0.04)]'
-            }`}>
-              <div className="w-16 h-14 rounded-2xl bg-red-500/10 border border-red-500/40 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Radio className="w-7 h-7 text-red-500 animate-pulse" />
-              </div>
-              <h1 className={`text-xl md:text-3xl font-black tracking-tight mb-4 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>ستاد دیجیتال فرماندهی و مدیریت همیار بحران</h1>
-              <p className={`text-sm md:text-base max-w-2xl mx-auto leading-relaxed ${darkMode ? 'text-slate-300' : 'text-slate-700 font-medium'}`}>
-                ما اینجا هستیم تا در زمان وقوع حوادث ناگهانی، مردم و نیروهای امدادی رو خیلی سریع و بدون فوت وقت به همدیگه متصل کنیم. اگر توی موقعیت اضطراری قرار گرفتید و به کمک نیاز دارید، یا اینکه خودتون تخصص دارید و مایلید به عنوان نیروی داوطلب به مردم محله‌تون خدمت کنید، این سامانه دقیقاً برای همین کار ساخته شده.
-              </p>
-              <div className="flex flex-wrap justify-center gap-3 mt-6">
-                <button type="button" onClick={() => navigateToView('report')} className="bg-gradient-to-r from-red-600 to-red-500 text-white font-black text-xs px-6 py-2.5 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95">🚨 ثبت فوری گزارش واقعه</button>
-                <button type="button" onClick={() => navigateToView('support-ai')} className="bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-black text-xs px-6 py-2.5 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95">🤖 گفتگو با هوش مصنوعی پشتیبان</button>
-                <button type="button" onClick={() => navigateToView('volunteer')} className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-black text-xs px-6 py-2.5 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95">📝 درخواست عضویت در سامانه همیاری</button>
-              </div>
-            </div>
-
-            <HomepageCircularStatistics
-              statistics={homepageStatistics}
-              loadingError={homepageStatisticsError}
-              darkMode={darkMode}
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-              <div className={`border rounded-3xl p-5 md:p-6 flex flex-col sm:flex-row items-center gap-4 transition-all duration-300 ${
-                darkMode 
-                  ? 'bg-slate-950/70 backdrop-blur-xl border-emerald-500/20 shadow-[0_0_25px_rgba(16,185,129,0.08)]' 
-                  : 'bg-gradient-to-br from-white via-emerald-50/10 to-emerald-50/30 border-emerald-200 shadow-[0_10px_25px_rgba(0,0,0,0.03)]'
+          <div className={`w-full h-full overflow-y-auto animate-fadeIn font-sans ${darkMode ? 'bg-slate-950' : 'bg-[#EEF2F7]'}`}>
+            <div className="max-w-7xl mx-auto p-4 md:p-7 space-y-6 md:space-y-7">
+              <section className={`relative overflow-hidden border rounded-3xl ${
+                darkMode
+                  ? 'bg-gradient-to-bl from-slate-900 via-slate-900 to-[#0a1733] border-slate-700/70 shadow-[0_20px_60px_rgba(0,0,0,.28)]'
+                  : 'bg-gradient-to-bl from-slate-50 via-white to-blue-50/60 border-slate-200 shadow-[0_18px_50px_rgba(15,23,42,.09)]'
               }`}>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0 shadow-inner">
-                  <UserPlus className="w-6 h-6 animate-pulse" />
-                </div>
-                <div className="text-center sm:text-right flex-1 space-y-1">
-                  <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>آمار پدافند مردمی</p>
-                  <p className={`text-xs md:text-sm font-semibold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                    تا این لحظه تعداد{' '}
-                    <span className={`text-xl md:text-2xl font-black font-mono px-1.5 align-middle text-shadow-sm animate-[pulse_2.5s_infinite] ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                      {homepageStatistics
-                        ? homepageStatistics.registeredVolunteers.toLocaleString('en-US')
-                        : homepageStatisticsError ? 'نامشخص' : '…'}
-                    </span>{' '}
-                    داوطلب برای کمک به شما عزیزان در سامانه ثبت‌نام کرده‌اند.
-                    <button onClick={() => navigateToView('volunteer')} className="inline-block font-black text-emerald-500 hover:text-emerald-400 transition-colors mr-1.5 focus:outline-none focus:underline">( فرم داوطلبی )</button>
-                  </p>
-                </div>
-              </div>
+                <div className="absolute -top-28 -left-20 w-72 h-72 rounded-full bg-blue-700/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-32 right-1/3 w-80 h-80 rounded-full bg-slate-600/10 blur-3xl pointer-events-none" />
+                <div className="relative grid lg:grid-cols-[1.2fr_0.8fr] gap-6 items-stretch p-5 sm:p-7 md:p-9">
+                  <div className="flex flex-col justify-center">
+                    <div className={`w-fit flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] md:text-xs font-black ${
+                      darkMode ? 'bg-red-500/10 border-red-500/25 text-red-300' : 'bg-white border-red-200 text-red-700 shadow-sm'
+                    }`}>
+                      <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" /></span>
+                      شبکه یکپارچه واکنش و امدادرسانی
+                    </div>
+                    <h1 className={`mt-5 text-xl sm:text-2xl md:text-[36px] leading-[1.35] font-black tracking-[-0.02em] ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
+                      در لحظه بحران،
+                      <span className="block text-[#2563EB] dark:text-blue-400">هر ثانیه برای نجات مهم است.</span>
+                    </h1>
+                    <p className={`mt-4 max-w-2xl text-sm md:text-base leading-8 font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                      همیار بحران، شهروندان، داوطلبان متخصص و اتاق فرمان را روی یک نقشه عملیاتی به هم متصل می‌کند؛ از ثبت موقعیت دقیق حادثه تا تأیید و اعزام نیروی امدادی.
+                    </p>
+                    <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                      <button type="button" onClick={() => navigateToView('report')} className="flex-1 inline-flex cursor-pointer items-center justify-center gap-2.5 bg-[#C2414A] hover:bg-[#B53640] text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-[0_7px_18px_rgba(194,65,74,.2)] transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-[0_10px_24px_rgba(194,65,74,.28)] active:scale-95">
+                        <AlertTriangle className="w-5 h-5" />
+                        ثبت فوری حادثه روی نقشه
+                      </button>
+                      <button type="button" onClick={() => navigateToView('support-ai')} className="flex-1 inline-flex cursor-pointer items-center justify-center gap-2.5 bg-[#3B6FC4] hover:bg-[#2F5FAE] text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-[0_7px_18px_rgba(59,111,196,.2)] transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-[0_10px_24px_rgba(59,111,196,.28)] active:scale-95">
+                        <Bot className="w-5 h-5" />
+                        گفتگو با هوش مصنوعی پشتیبان
+                      </button>
+                      <button type="button" onClick={() => navigateToView('volunteer')} className="flex-1 inline-flex cursor-pointer items-center justify-center gap-2.5 bg-[#2F8F68] hover:bg-[#267A59] text-white font-black text-xs px-4 py-3.5 rounded-xl shadow-[0_7px_18px_rgba(47,143,104,.2)] transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-[0_10px_24px_rgba(47,143,104,.28)] active:scale-95">
+                        <UserPlus className="w-5 h-5" />
+                        درخواست عضویت در سامانه همیاران
+                      </button>
+                    </div>
+                    <div className={`mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[10px] md:text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> ثبت موقعیت روی نقشه نشان</span>
+                      <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> پایش و راستی‌آزمایی</span>
+                      <span className="flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> اعزام نیروهای تأییدشده</span>
+                    </div>
+                  </div>
 
-              <div className={`border rounded-3xl p-5 md:p-6 flex flex-col sm:flex-row items-center gap-4 transition-all duration-300 ${
-                darkMode 
-                  ? 'bg-slate-950/70 backdrop-blur-xl border-red-500/20 shadow-[0_0_25px_rgba(239,68,68,0.08)]' 
-                  : 'bg-gradient-to-br from-white via-red-50/10 to-red-50/30 border-red-200 shadow-[0_10px_25px_rgba(0,0,0,0.03)]'
+                  <div className={`relative min-h-[260px] rounded-2xl border p-4 md:p-5 overflow-hidden ${
+                    darkMode ? 'bg-[#071226] border-slate-700/70' : 'bg-[#F8FAFC] border-slate-300 shadow-[0_16px_36px_rgba(15,23,42,.12)]'
+                  }`}>
+                    <div className={`absolute inset-0 ${darkMode ? 'opacity-30' : 'opacity-70'}`} style={{ backgroundImage: darkMode ? 'linear-gradient(rgba(59,130,246,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,.18) 1px, transparent 1px)' : 'linear-gradient(rgba(37,99,235,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(37,99,235,.09) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+                    <div className={`relative flex items-center justify-between ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
+                      <div>
+                        <p className={`text-[10px] font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>مرکز عملیات جغرافیایی</p>
+                        <p className="mt-1 text-sm font-black">پایش موقعیت‌محور بحران</p>
+                      </div>
+                      <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${darkMode ? 'bg-blue-500/15 border-blue-400/20' : 'bg-blue-50 border-blue-200 shadow-sm'}`}><MapPin className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-[#2563EB]'}`} /></div>
+                    </div>
+                    <div className="relative mt-8 flex items-center justify-center">
+                      <div className={`relative w-40 h-40 rounded-full border flex items-center justify-center ${darkMode ? 'border-blue-400/20' : 'border-blue-300/70 bg-white/40 shadow-[0_8px_28px_rgba(37,99,235,.08)]'}`}>
+                        <div className={`absolute inset-5 rounded-full border ${darkMode ? 'border-blue-400/20' : 'border-blue-300/60'}`} />
+                        <div className={`absolute inset-10 rounded-full border ${darkMode ? 'border-blue-400/30' : 'border-blue-400/60'}`} />
+                        <div className={`absolute w-full h-px bg-gradient-to-r from-transparent to-transparent ${darkMode ? 'via-blue-400/40' : 'via-blue-500/30'}`} />
+                        <div className={`absolute h-full w-px bg-gradient-to-b from-transparent to-transparent ${darkMode ? 'via-blue-400/40' : 'via-blue-500/30'}`} />
+                        <div className="relative w-14 h-14 rounded-full bg-red-500/15 border border-red-400/30 flex items-center justify-center shadow-[0_0_35px_rgba(239,68,68,.25)]">
+                          <Radio className={`w-6 h-6 animate-pulse ${darkMode ? 'text-red-400' : 'text-[#DC2626]'}`} />
+                        </div>
+                        <span className="radar-orbit radar-orbit-green">
+                          <span className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-emerald-500 border-2 shadow-[0_0_12px_#34d399] ${darkMode ? 'border-slate-900' : 'border-white'}`} />
+                        </span>
+                        <span className="radar-orbit radar-orbit-blue">
+                          <span className={`absolute -top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 shadow-[0_0_12px_#60a5fa] ${darkMode ? 'border-slate-900' : 'border-white'}`} />
+                        </span>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => navigateToView('support-ai')} className={`relative mt-5 w-full flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3.5 text-right shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 ${darkMode ? 'border-blue-400/30 bg-slate-800/95 text-white shadow-black/20 hover:border-blue-400/60 hover:bg-slate-800' : 'border-blue-200 bg-white/95 text-[#0F172A] shadow-[0_8px_22px_rgba(15,23,42,.12)] hover:border-blue-400 hover:bg-blue-50/80 hover:shadow-[0_12px_28px_rgba(37,99,235,.16)]'}`}>
+                      <span>
+                        <span className={`block text-sm font-extrabold ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>دستیار هوشمند بحران</span>
+                        <span className={`mt-1 block text-[11px] font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>راهنمایی سریع در شرایط اضطراری</span>
+                      </span>
+                      <span className={`w-11 h-11 shrink-0 rounded-full border flex items-center justify-center shadow-sm ${darkMode ? 'border-blue-400/30 bg-blue-500/15' : 'border-blue-200 bg-blue-50'}`}>
+                        <Bot className={`w-6 h-6 ${darkMode ? 'text-blue-400' : 'text-[#2563EB]'}`} />
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <HomepageCircularStatistics statistics={homepageStatistics} loadingError={homepageStatisticsError} darkMode={darkMode} />
+
+              <section className="space-y-4">
+                <div>
+                  <p className="text-[10px] md:text-xs font-black text-blue-600 dark:text-blue-400">فرآیند واکنش هماهنگ</p>
+                  <h2 className={`mt-1 text-lg md:text-2xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>از گزارش شهروند تا اعزام نیروی امدادی</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { step: '1', icon: MapPin, title: 'ثبت دقیق روی نقشه', text: 'شهروند موقعیت حادثه و جزئیات ضروری را به‌صورت مستقیم روی نقشه نشان ثبت می‌کند.', color: 'text-blue-500', surface: 'bg-blue-500/10', lightSurface: 'bg-[#F8FAFC]' },
+                    { step: '2', icon: ShieldCheck, title: 'بررسی در اتاق فرمان', text: 'گزارش، سطح ریسک و موقعیت مکانی توسط تیم مدیریت بحران پایش و راستی‌آزمایی می‌شود.', color: 'text-amber-500', surface: 'bg-amber-500/10', lightSurface: 'bg-[#F9FAFB]' },
+                    { step: '3', icon: Truck, title: 'اعزام همیار متخصص', text: 'نیروهای تأییدشده مأموریت متناسب با تخصص خود را دریافت کرده و برای امدادرسانی اعزام می‌شوند.', color: 'text-emerald-500', surface: 'bg-emerald-500/10', lightSurface: 'bg-[#F7FAF8]' }
+                  ].map(item => (
+                    <article key={item.step} className={`group border rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 ${
+                      darkMode ? 'bg-slate-900/80 border-slate-800 hover:border-slate-700 hover:shadow-[0_16px_36px_rgba(0,0,0,.22)]' : `${item.lightSurface} border-emerald-200 shadow-[0_8px_24px_rgba(15,23,42,.055)] hover:border-emerald-300 hover:shadow-[0_16px_36px_rgba(15,23,42,.09)]`
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className={`${darkMode ? 'w-11 h-11' : 'w-12 h-12'} rounded-xl flex items-center justify-center ${item.surface}`}><item.icon className={`${darkMode ? 'w-5 h-5' : 'w-6 h-6'} ${item.color}`} /></div>
+                        <span className={`w-9 h-9 rounded-full border flex items-center justify-center font-sans text-sm font-extrabold tabular-nums shadow-sm ${
+                          darkMode ? 'bg-emerald-500/5 border-emerald-500/40 text-slate-300' : 'bg-emerald-50/70 border-emerald-300 text-[#0F172A]'
+                        }`}>{item.step}</span>
+                      </div>
+                      <h3 className={`mt-4 text-sm md:text-base font-extrabold ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>{item.title}</h3>
+                      <p className={`mt-2 text-xs md:text-sm leading-7 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{item.text}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className={`grid md:grid-cols-2 gap-4 border rounded-3xl p-4 md:p-5 ${
+                darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-100 border-slate-200'
               }`}>
-                <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/40 flex items-center justify-center text-red-500 shrink-0 shadow-inner">
-                  <ShieldAlert className="w-6 h-6 animate-pulse" />
+                <div className={`rounded-2xl p-5 flex gap-4 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-[#F8FAFC] border-slate-200 shadow-[0_6px_18px_rgba(15,23,42,.04)]'}`}>
+                  <div className="w-11 h-11 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0"><User className="w-5 h-5 text-blue-600" /></div>
+                  <div><h3 className={`text-base font-extrabold ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>نقش شهروندان</h3><p className={`mt-2 text-sm leading-7 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>ثبت سریع و دقیق حادثه یا پیوستن به شبکه داوطلبان برای کمک تخصصی در محله و شهر خود.</p></div>
                 </div>
-                <div className="text-center sm:text-right flex-1 space-y-1">
-                  <p className={`text-xs font-bold uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>وضعیت زنده پایش حوادث</p>
-                  <p className={`text-xs md:text-sm font-semibold leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                    تاکنون آمار زنده و رسمی{' '}
-                    <span className={`text-xl md:text-2xl font-black font-mono px-1.5 align-middle text-shadow-sm animate-[pulse_2.5s_infinite] ${darkMode ? 'text-red-400' : 'text-red-500'}`}>
-                      {homepageStatistics
-                        ? homepageStatistics.registeredIncidents.toLocaleString('en-US')
-                        : homepageStatisticsError ? 'نامشخص' : '…'}
-                    </span>{' '}
-                    حادثه اضطراری و جدی در ساختار شبکه مدیریت ثبت گردیده است.
-                    <button onClick={() => navigateToView('report')} className="inline-block font-black text-red-500 hover:text-red-400 transition-colors mr-1.5 focus:outline-none focus:underline">( فرم ثبت حادثه )</button>
-                  </p>
+                <div className={`rounded-2xl p-5 flex gap-4 border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-[#F7FAF8] border-slate-200 shadow-[0_6px_18px_rgba(15,23,42,.04)]'}`}>
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-emerald-600" /></div>
+                  <div><h3 className={`text-base font-extrabold ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>نقش همیاران رسمی</h3><p className={`mt-2 text-sm leading-7 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>دریافت مأموریت، هماهنگی با اتاق فرمان و امدادرسانی ایمن و سریع به افراد نیازمند.</p></div>
                 </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h2 className={`text-base md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}><Activity className="w-5 h-5 text-red-600" /> چرخه گردش اطلاعات و عملکرد فنی سامانه:</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className={`border p-6 rounded-2xl space-y-3 transition shadow-md ${darkMode ? 'bg-slate-950 border-slate-800 text-red-50' : 'bg-pink-50 border-pink-200 text-slate-900 shadow-xl'}`}>
-                  <div className={`w-11 h-11 rounded-xl font-mono text-lg font-black flex items-center justify-center ${darkMode ? 'bg-red-900 text-red-400 border border-red-700' : 'bg-pink-100 text-red-700 shadow'}`}>1</div>
-                  <h3 className="text-sm md:text-base font-black">۱. گزارش زنده شهروندان</h3>
-                  <p className="text-xs md:text-sm leading-relaxed font-semibold opacity-90">مردم و ناظران عینی حادثه را روی نقشه ماهواره‌ای «نشان» علامت‌گذاری کرده و پس از دریافت رمز تایید پیامکی بله یا کاوه‌نگار، عمق فاجعه را به سامانه همیار بحران گزارش می دهند.</p>
-                </div>
-                <div className={`border p-6 rounded-2xl space-y-3 transition shadow-md ${darkMode ? 'bg-slate-950 border-slate-800 text-red-50' : 'bg-blue-50 border-blue-200 text-slate-900 shadow-xl'}`}>
-                  <div className={`w-11 h-11 rounded-xl font-mono text-lg font-black flex items-center justify-center ${darkMode ? 'bg-red-900 text-red-400 border border-red-700' : 'bg-blue-100 text-blue-700 shadow'}`}>2</div>
-                  <h3 className="text-sm md:text-base font-black">۲. پایش و راستی‌آزمایی ستاد</h3>
-                  <p className="text-xs md:text-sm leading-relaxed font-semibold opacity-90">در اتاق فرمان سامانه مدیریت بحران صحت گزارش‌ها، میزان ریسک و موقعیت دقیق ماهواره‌ای حوادث زلزله, بمباران، آتش‌سوزی، سیل و غیره را پایش و تایید میکنند.</p>
-                </div>
-                <div className={`border p-6 rounded-2xl space-y-3 transition shadow-md ${darkMode ? 'bg-slate-950 border-slate-800 text-red-50' : 'bg-pink-50 border-pink-200 text-slate-900 shadow-xl'}`}>
-                  <div className={`w-11 h-11 rounded-xl font-mono text-lg font-black flex items-center justify-center ${darkMode ? 'bg-red-900 text-red-400 border border-red-700' : 'bg-pink-100 text-red-700 shadow'}`}>3</div>
-                  <h3 className="text-sm md:text-base font-black">۳. اعزام تاکتیکی امدادگران</h3>
-                  <p className="text-xs md:text-sm leading-relaxed font-semibold opacity-90">امدادگران و همیاران رسمی که تخصص پرونده آنها تایید شده، ماموریت را در کارتابل خود قبول کرده و به عنوان واحدهای واکنش سریع اعزام می‌شوند.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className={`border p-5 rounded-3xl space-y-3 shadow-md ${darkMode ? 'bg-gradient-to-br from-slate-950 to-slate-900 border-red-900/40' : 'bg-white border-red-200'}`}>
-                <h3 className="text-xs md:text-sm font-black text-red-600 flex items-center gap-1.5"><User className="w-4 h-4" /> شما به عنوان شهروند داوطلب چه کار می‌توانید بکنید؟</h3>
-                <ul className={`text-[11px] space-y-2.5 font-bold list-disc list-inside pr-1 ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>
-                  <li>ثبت دقیق هرگونه شرایط بحرانی، هرگونه درخواست کمک و غیره مانند تخریب سازه، در شرایط جنگی، سیلاب و غیره با مختصات GPS</li>
-                  <li>داوطلب شدن برای کمک در شرایط بحرانی به افراد نیازمند در سامانه با تکمیل فرم احراز هویت.</li>
-                </ul>
-              </div>
-              <div className={`border p-5 rounded-3xl space-y-3 shadow-md ${darkMode ? 'bg-gradient-to-br from-slate-950 to-slate-900 border-red-900/40' : 'bg-white border-red-200'}`}>
-                <h3 className="text-xs md:text-sm font-black text-red-500 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> وظایف همیاران رسمی و کادر مدیریت بحران چیست؟</h3>
-                <ul className={`text-[11px] space-y-2.5 font-bold list-disc list-inside pr-1 ${darkMode ? 'text-slate-300' : 'text-slate-800'}`}>
-                  <li>کمک رسانی به مردم نیازمند در شرایط بحران و شرایط اضطراری, اطلاع رسانی به هلال احمر و پلیس ۱۲۵ یا غیره در صورت نیاز.</li>
-                </ul>
-              </div>
+              </section>
             </div>
           </div>
         )}

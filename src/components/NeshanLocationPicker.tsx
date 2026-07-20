@@ -263,7 +263,7 @@ export default function NeshanLocationPicker({
         </div>
       )}
 
-      <div className="absolute top-4 right-4 z-20 flex gap-2">
+      <div className="absolute bottom-4 right-4 z-[1000] flex gap-2">
         <button
           type="button"
           onClick={() => toggleMode('manual')}
@@ -300,30 +300,6 @@ export default function NeshanLocationPicker({
         </button>
       </div>
 
-      <div
-        className={`absolute bottom-4 right-4 left-4 z-20 flex items-center justify-between gap-3 backdrop-blur-md rounded-xl px-4 py-2.5 border transition-all ${
-          darkMode
-            ? 'bg-slate-900/80 border-slate-700/60'
-            : 'bg-white/80 border-slate-300/60'
-        }`}
-      >
-        <div className="flex items-center gap-2 text-[11px] font-bold">
-          <MapPin className={`w-3.5 h-3.5 ${mode === 'gps' ? 'text-amber-400' : 'text-emerald-400'}`} />
-          <span className={darkMode ? 'text-slate-300' : 'text-slate-700'}>
-            {mode === 'gps' ? 'موقعیت مکانی فعلی' : 'موقعیت انتخاب‌شده'}
-          </span>
-        </div>
-
-        <div className="text-[11px] font-mono font-black tracking-tighter text-right dir-ltr">
-          <span className={darkMode ? 'text-cyan-400' : 'text-cyan-700'}>
-            {selectedCoords.lat.toFixed(6)}
-          </span>
-          <span className={darkMode ? 'text-slate-600' : 'text-slate-400'}> , </span>
-          <span className={darkMode ? 'text-amber-400' : 'text-amber-700'}>
-            {selectedCoords.lng.toFixed(6)}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

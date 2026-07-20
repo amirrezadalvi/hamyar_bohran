@@ -68,6 +68,45 @@
   --cursor-glow-opacity: 0.06;
 }
 
+.radar-orbit {
+  position: absolute;
+  display: block;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  transform-origin: center center;
+  will-change: transform;
+  z-index: 1;
+}
+
+.radar-orbit-green {
+  transform: rotate(0deg);
+  animation: radar-orbit-green 10s linear infinite;
+}
+
+.radar-orbit-blue {
+  transform: rotate(180deg);
+  animation: radar-orbit-blue 11s linear infinite;
+}
+
+@keyframes radar-orbit-green {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-orbit-blue {
+  from {
+    transform: rotate(180deg);
+  }
+  to {
+    transform: rotate(540deg);
+  }
+}
+
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
   .cursor-glow {
     display: none;

@@ -17,3 +17,15 @@ data/*.sqlite-*
 
 # Test files
 test-s3.mjs
+
+# Android build files
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Release files
+*.apk
+*.idsig
+*.keystore
+*.jks
